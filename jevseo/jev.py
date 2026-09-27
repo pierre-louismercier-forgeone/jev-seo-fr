@@ -18,6 +18,8 @@ import requests
 
 from jevseo.env import secret
 
+from jevseo import fr
+
 API = "https://api.typesafe.ai/v1/systemone"
 MODELS_API = "https://api.typesafe.ai/v1/models"
 MODEL = "jev-latest"
@@ -60,6 +62,8 @@ PAGE_TYPES = {
     "legal_or_policy": "Terms, privacy, cookies, imprint or other policy text",
     "other": "None of the above fits",
 }
+# FR: ajoute realisations, zone d'intervention, mentions legales, recrutement.
+PAGE_TYPES = fr.types_page(PAGE_TYPES)
 INTENTS = {
     "informational": "Someone wanting to learn or understand something would land here",
     "commercial": "Someone comparing options before choosing a provider or product would land here",
@@ -140,6 +144,10 @@ def page_questions(p: dict) -> dict:
             "The text ends without inviting any action, or only generic navigation remains",
         ),
     }
+    # FR: une page a vocation locale porte deux questions de plus, la ou se
+    # joue le risque de page satellite.
+    if fr.page_locale(p):
+        q.update(fr.questions_locales(p, choice, noul, score))
     if p.get("title"):
         q["title_fit"] = score(
             "How accurately and attractively does `page.title` describe what `page` actually contains?",
@@ -197,17 +205,10 @@ def page_state(p: dict, site_ctx: dict) -> dict:
 
 
 # ---------------------------------------------------------------- site level
-BUSINESS_MODELS = {
-    "local_service": "Serves customers in a specific town or region, such as a trade, clinic or restaurant",
-    "ecommerce": "Sells physical or digital products through an online store",
-    "saas_or_software": "Sells software, an app or an API",
-    "agency_or_b2b_services": "Sells professional services to businesses",
-    "publisher_or_media": "Earns from content, news, reviews or advertising",
-    "education_or_course": "Sells or offers courses, training or a community",
-    "nonprofit_or_public": "Charity, public body or community organisation",
-    "personal_or_portfolio": "A person's portfolio, CV or personal brand",
-    "other": "None of the above fits",
-}
+# FR: segmentation du marche francais. Les 9 categories upstream etaient
+# pensees pour un marche SaaS americain et ecrasaient tout le local
+# dans une seule case (fr.MODELES_ENTREPRISE).
+BUSINESS_MODELS = fr.MODELES_ENTREPRISE
 
 
 def site_questions() -> dict:
@@ -261,7 +262,10 @@ def site_state(home: dict, pages: list[dict]) -> dict:
 # ---------------------------------------------------------------- page pairs
 def overlap_candidates(pages: list[dict], limit: int = 40) -> list[tuple[dict, dict, float]]:
     """Deterministic shortlist: pages whose title and H1 words overlap. Code picks, Jev judges."""
-    stop = set("the a an and or of for to in on with your our you we is are at by from how what why this that best".split())
+    # FR: sans les mots vides francais, la similarite de Jaccard etait gonflee
+    # par "le/la/les/de/des/du/et/pour" et la preselection des paires de
+    # cannibalisation remontait de fausses paires, silencieusement.
+    stop = set("the a an and or of for to in on with your our you we is are at by from how what why this that best".split()) | fr.MOTS_VIDES
 
     def words(p):
         text = f"{p.get('title') or ''} {' '.join(p.get('h1') or [])}".lower()
@@ -276,7 +280,12 @@ def overlap_candidates(pages: list[dict], limit: int = 40) -> list[tuple[dict, d
             if len(A) < 2 or len(B) < 2 or a.get("text_hash") == b.get("text_hash"):
                 continue
             j = len(A & B) / len(A | B)
-            if j >= 0.4:
+            # FR: deux pages ville du meme gabarit ne se cannibalisent pas, elles
+            # sont l'architecture voulue. Sans ce filtre, un site ville x service
+            # sature la presélection et Jev declare une cannibalisation generale.
+            # Leur vrai risque (page satellite dupliquee) est traite par la regle
+            # `doorway_pages` dans checks.py.
+            if j >= 0.4 and not fr.paire_geographique(a.get("title") or "", b.get("title") or ""):
                 pairs.append((a, b, round(j, 2)))
     pairs.sort(key=lambda t: -t[2])
     return pairs[:limit]

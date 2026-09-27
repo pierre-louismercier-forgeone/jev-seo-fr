@@ -13,6 +13,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from jevseo import checks, jev, score  # noqa: E402
 from jevseo.parse import normalize_url, parse_page  # noqa: E402
 
+def assert_document(case, out):
+    """FR: WeasyPrint exige Pango/GLib au niveau systeme. La ou ils manquent, le
+    rendu ecrit report.html au lieu de report.pdf. On verifie le PDF quand il est
+    possible, le HTML sinon, mais on exige toujours qu'un document soit produit."""
+    if "pdf" in out:
+        case.assertEqual(out["pdf"].read_bytes()[:5], b"%PDF-")
+    else:
+        case.assertIn("html", out, "ni PDF ni HTML produit")
+        case.assertIn("<html", out["html"].read_text()[:2000].lower())
+
+
 HOME = "https://example.org/"
 PAGE_HTML = """<!doctype html><html lang="en"><head>
 <title>Acme Plumbing | Emergency plumbers in Leeds</title>
@@ -406,7 +417,7 @@ class RenderTests(unittest.TestCase):
 
     def test_all_formats(self):
         tmp, out = self.build()
-        self.assertEqual(out["pdf"].read_bytes()[:5], b"%PDF-")
+        assert_document(self, out)
         self.assertIn("## Priority actions", out["md"].read_text())
         from openpyxl import load_workbook
 
@@ -448,7 +459,7 @@ class RenderTests(unittest.TestCase):
         self.assertIn("PARTIAL AUDIT", digest(data))
         out = build(tmp, ["pdf", "xlsx", "md"], log=lambda *_: None)
         self.assertIn("Partial audit", out["md"].read_text())
-        self.assertEqual(out["pdf"].read_bytes()[:5], b"%PDF-")
+        assert_document(self, out)
 
     def test_narrative_rejects_unknown_ids(self):
         with self.assertRaises(SystemExit):
@@ -469,3 +480,63 @@ class RenderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FrancisationTests(unittest.TestCase):
+    """FR: correctifs de langue, gabarit geographique et pages satellites."""
+
+    def test_ancres_generiques_francaises(self):
+        from jevseo import checks
+        for a in ["En savoir plus", "Lire la suite", "Découvrir", "cliquez ici", "Voir plus"]:
+            self.assertTrue(checks.generic_anchor(a), a)
+        for a in ["Read more", "click here"]:
+            self.assertTrue(checks.generic_anchor(a), a)
+        for a in ["Nos honoraires", "Recouvrement de créances à Lyon", "Contactez le cabinet"]:
+            self.assertFalse(checks.generic_anchor(a), a)
+
+    def test_mots_vides_francais_dans_la_preselection(self):
+        from jevseo import fr, jev
+        self.assertTrue({"le", "les", "des", "pour", "votre"} <= fr.MOTS_VIDES)
+        pages = [{"url": "https://x.fr/a", "title": "Plomberie à Lyon", "h1": ["Plomberie à Lyon"]},
+                 {"url": "https://x.fr/b", "title": "Chauffage à Lyon", "h1": ["Chauffage à Lyon"]}]
+        # Titres differents sur le mot porteur : ne doivent pas etre une paire.
+        self.assertEqual(jev.overlap_candidates(pages), [])
+
+    def test_paire_geographique(self):
+        from jevseo import fr
+        oui = [("Société de recouvrement à Nantes | Cabinet Wegelin",
+                "Société de recouvrement à Reims | Cabinet Wegelin"),
+               ("Serrurier à Meaux", "Serrurier sur Melun"),
+               ("Plombier Lyon 3e", "Plombier Villeurbanne")]
+        for a, b in oui:
+            self.assertTrue(fr.paire_geographique(a, b), f"{a} / {b}")
+        non = [("Société de recouvrement à Nantes", "Nous contacter"),
+               ("Serrurier à Meaux", "Dépannage serrurerie à Meaux"),
+               ("Plombier à Lyon", "Plombier")]
+        for a, b in non:
+            self.assertFalse(fr.paire_geographique(a, b), f"{a} / {b}")
+
+    def test_gabarit_geographique_exclu_de_la_cannibalisation(self):
+        from jevseo import jev
+        pages = [{"url": "https://x.fr/lyon", "title": "Serrurier à Lyon | Acme", "h1": ["Serrurier à Lyon"]},
+                 {"url": "https://x.fr/nantes", "title": "Serrurier à Nantes | Acme", "h1": ["Serrurier à Nantes"]}]
+        self.assertEqual(jev.overlap_candidates(pages), [],
+                         "deux pages ville du meme gabarit ne sont pas une cannibalisation")
+
+    def test_regle_pages_satellites_dans_les_deux_sens(self):
+        from jevseo import checks, fr
+        commun = ("Notre cabinet intervient pour le recouvrement de creances aupres des entreprises. "
+                  "Nous prenons en charge la phase amiable puis la phase judiciaire si necessaire. "
+                  "Nos delais sont courts et nos honoraires au resultat. ") * 3
+        # Deux pages ville quasi identiques -> la regle doit se declencher.
+        dup = [{"url": "https://x.fr/a", "title": "Recouvrement à Nantes | Acme", "h1": ["Recouvrement à Nantes"],
+                "text_excerpt": commun + "Nantes.", "word_count": 400, "status": 200, "kind": "page"},
+               {"url": "https://x.fr/b", "title": "Recouvrement à Reims | Acme", "h1": ["Recouvrement à Reims"],
+                "text_excerpt": commun + "Reims.", "word_count": 400, "status": 200, "kind": "page"}]
+        sim = fr.similarite_texte(dup[0]["text_excerpt"], dup[1]["text_excerpt"])
+        self.assertGreaterEqual(sim, fr.SEUIL_PAGE_SATELLITE, f"similarite mesuree {sim:.0%}")
+        # Deux pages ville reellement differenciees -> la regle doit rester muette.
+        a = "Nous intervenons a Nantes depuis 2011, principalement aupres des PME du secteur naval et portuaire. "
+        b = "A Reims, notre activite porte surtout sur les exploitations viticoles et le negoce de champagne. "
+        self.assertLess(fr.similarite_texte(a * 6, b * 6), fr.SEUIL_PAGE_SATELLITE)
+        self.assertIn("doorway_pages", checks.RULES)

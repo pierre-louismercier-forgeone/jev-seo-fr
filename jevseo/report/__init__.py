@@ -339,10 +339,20 @@ def build(folder: Path, formats: list[str], log=print) -> dict:
     vm = view_model(data, folder)
     written = {}
     if "pdf" in formats:
-        from jevseo.report.pdf import write_pdf
-
+        # FR: WeasyPrint exige Pango/GLib au niveau systeme. Quand ils manquent,
+        # on ecrit quand meme le HTML (qui est le livrable ForgeOne) et on
+        # continue vers XLSX et MD au lieu de faire tomber tout le rendu.
         log("rendering PDF")
-        written["pdf"] = write_pdf(vm, folder / "report.pdf")
+        try:
+            from jevseo.report.pdf import write_pdf
+
+            written["pdf"] = write_pdf(vm, folder / "report.pdf")
+        except Exception as err:
+            from jevseo.report.pdf import render_html
+
+            (folder / "report.html").write_text(render_html(vm))
+            written["html"] = folder / "report.html"
+            log(f"PDF indisponible ({type(err).__name__}); report.html ecrit a la place")
     if "xlsx" in formats:
         from jevseo.report.xlsx import write_xlsx
 

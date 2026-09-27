@@ -10,6 +10,8 @@ import re
 from collections import defaultdict
 from urllib.parse import urlparse
 
+from jevseo import fr
+
 from jevseo.parse import normalize_url
 
 G = "https://developers.google.com/search/docs/"
@@ -33,6 +35,7 @@ SRC = {
     "sd_local": G + "appearance/structured-data/local-business",
     "sd_faq": G + "appearance/structured-data/faqpage",
     "hreflang": G + "specialty/international/localized-versions",
+    "doorway": G + "spam-policies#doorway-pages",  # FR: pages satellites
     "mobile": G + "crawling-indexing/mobile/mobile-sites-mobile-first-indexing",
     "helpful": G + "fundamentals/creating-helpful-content",
     "starter": G + "fundamentals/seo-starter-guide",
@@ -67,7 +70,9 @@ CATEGORIES = {
     "visibility": "Search visibility and authority",
 }
 SEVERITY_WEIGHT = {"critical": 10, "high": 6, "medium": 3, "low": 1, "info": 0}
-GENERIC_ANCHORS = {"click here", "here", "read more", "learn more", "more", "this", "link", "go", "details", "continue", "see more", "view more"}
+# FR: fusion EN + FR. Sans les ancres francaises cette regle etait muette
+# sur tout site francophone (fr.ANCRES_GENERIQUES).
+GENERIC_ANCHORS = {"click here", "here", "read more", "learn more", "more", "this", "link", "go", "details", "continue", "see more", "view more"} | fr.ANCRES_GENERIQUES
 
 # id: (category, severity, title, fix, source key, effort 1-4, heuristic)
 RULES = {
@@ -112,6 +117,11 @@ RULES = {
     "schema_required": ("structured", "low", "Structured data missing properties Google requires for rich results", "Add the missing required properties listed in the evidence, or remove markup that cannot be completed truthfully.", "sd", 1, False),
     "faq_rich_result_limited": ("structured", "info", "FAQPage markup: rich results only for government and health sites", "Keep the markup if it helps other consumers, but do not expect FAQ rich results unless the site is a well-known government or health authority.", "sd_faq", 1, False),
     "og_missing": ("structured", "low", "Open Graph title or image missing", "Add og:title, og:description and og:image for link previews.", "og", 1, False),
+    # FR: risque propre a l'architecture ville x service, le pattern local
+    # le plus courant en France. Ces pages ne se cannibalisent pas entre
+    # elles (meme gabarit voulu), mais Google sanctionne les pages ville
+    # qui ne different que par le nom de la ville.
+    "doorway_pages": ("content", "high", "Pages ville quasi identiques (risque de page satellite)", "Differenciez chaque page ville par du contenu local reel : references et chantiers sur place, delais et zone d'intervention, tarifs locaux, avis de clients de la ville, equipe concernee. Sinon regroupez-les sur une page unique avec une liste de zones desservies.", "doorway", 3, True),
     "hreflang_issues": ("structured", "medium", "hreflang annotations incomplete", "Each language version needs a self-reference and return links; add x-default where useful.", "hreflang", 2, False),
     "ai_bots_blocked": ("ai", "info", "AI crawlers blocked in robots.txt", "Decide deliberately. Blocking Google-Extended does not affect Google Search; blocking search-oriented AI bots can remove the site from those answer engines.", "crawlers_google", 1, False),
     "llms_txt_missing": ("ai", "info", "No llms.txt file", "Optional. llms.txt is a community proposal, not a search engine requirement.", "llms", 1, True),
@@ -124,6 +134,12 @@ RULES = {
     "generic_anchors": ("links", "low", "Internal links with generic anchor text", "Use anchor text that describes the destination.", "links", 1, False),
     "broken_external_links": ("links", "low", "External links returning errors", "Update or remove outbound links that no longer resolve.", "broken", 1, False),
 }
+
+
+# FR: libelles des regles et des categories en francais, appliques a l'import.
+# Les identifiants, severites et seuils restent ceux de l'upstream, donc un
+# `git pull upstream main` reste possible sans conflit sur cette couche.
+fr.franciser_regles(RULES, CATEGORIES)
 
 
 def finding(rule_id: str, urls: list[str], evidence: str, detail: dict | None = None, severity: str | None = None, fix: str | None = None) -> dict:
@@ -273,7 +289,7 @@ def run_checks(crawl: dict) -> list[dict]:
     dup = {t: u for t, u in titles.items() if len(u) > 1}
     if dup:
         out.append(finding("title_duplicate", sorted({x for u in dup.values() for x in u}), f"{len(dup)} titles shared by several pages", {"groups": [{"title": t, "urls": u} for t, u in list(dup.items())[:30]]}))
-    odd = [p for p in ix if p.get("title") and not 15 <= len(p["title"]) <= 65]
+    odd = [p for p in ix if p.get("title") and not fr.TITRE_MIN <= len(p["title"]) <= fr.TITRE_MAX]  # FR: 65 -> 75
     if odd:
         out.append(finding("title_length", [p["url"] for p in odd], "; ".join(f"{len(p['title'])} chars" for p in odd[:8])))
     multi = [p["url"] for p in pages if p.get("title_count", 0) > 1]
@@ -300,12 +316,29 @@ def run_checks(crawl: dict) -> list[dict]:
     miss = [p["url"] for p in pages if not p.get("viewport")]
     if miss:
         out.append(finding("viewport_missing", miss, f"{len(miss)} pages"))
-    thin = [p for p in ix if p["word_count"] < 150]
+    thin = [p for p in ix if p["word_count"] < fr.SEUIL_CONTENU_MINCE]  # FR: 150 -> 180
     if thin:
         out.append(finding("thin_content", [p["url"] for p in thin], "; ".join(f"{urlparse(p['url']).path or '/'}: {p['word_count']} words" for p in thin[:8]), {"word_counts": {p["url"]: p["word_count"] for p in thin}}))
     dup = {h: u for h, u in texts.items() if len(u) > 1}
     if dup:
         out.append(finding("duplicate_content", sorted({x for u in dup.values() for x in u}), f"{len(dup)} groups of pages with identical main text", {"groups": list(dup.values())[:20]}))
+    # FR: pages ville du meme gabarit dont le texte se recoupe trop.
+    geo_dup, geo_seen = [], set()
+    for i, a in enumerate(ix):
+        for b in ix[i + 1:]:
+            if not fr.paire_geographique(a.get("title") or "", b.get("title") or ""):
+                continue
+            sim = fr.similarite_texte(a.get("text_excerpt"), b.get("text_excerpt"))
+            if sim >= fr.SEUIL_PAGE_SATELLITE:
+                geo_dup.append((a["url"], b["url"], round(sim, 2)))
+                geo_seen.update((a["url"], b["url"]))
+    if geo_seen:
+        worst = sorted(geo_dup, key=lambda t: -t[2])[:6]
+        out.append(finding(
+            "doorway_pages", sorted(geo_seen),
+            f"{len(geo_seen)} pages ville partagent le meme gabarit avec un texte recoupe a {fr.SEUIL_PAGE_SATELLITE:.0%} ou plus ; "
+            + "; ".join(f"{urlparse(a).path} vs {urlparse(b).path}: {s:.0%}" for a, b, s in worst),
+            {"pairs": [{"a": a, "b": b, "similarity": s} for a, b, s in sorted(geo_dup, key=lambda t: -t[2])[:40]]}))
     alt = [p for p in pages if p["images"]["missing_alt"]]
     if alt:
         total = sum(p["images"]["missing_alt"] for p in alt)

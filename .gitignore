@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 jev-seo-reports/
 .env
+
+# fork ForgeOne
+.venv/
+jev-seo-reports/
