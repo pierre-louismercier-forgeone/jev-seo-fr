@@ -362,6 +362,14 @@ def build(folder: Path, formats: list[str], log=print) -> dict:
         from jevseo.report.md import write_md
 
         written["md"] = write_md(vm, folder / "report.md")
+    # FR: l'explorateur ne recalcule rien, il ouvre audit.json. Le rapport A4
+    # dit ce qui ne va pas ; l'explorateur dit pourquoi Jev l'a dit, sur quelle
+    # page, avec quelle certitude.
+    if "explorer" in formats:
+        from jevseo.report.explorer import write_explorer
+
+        log("building explorer")
+        written["explorer"] = write_explorer(data, folder / "explorer.html")
     for k, v in written.items():
         log(f"{k}: {v}")
     for issue in vm["narrative"].get("effort_mismatches") or []:

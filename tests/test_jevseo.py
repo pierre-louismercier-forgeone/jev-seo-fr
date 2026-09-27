@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -782,3 +783,50 @@ class InvisibiliteTests(unittest.TestCase):
         from jevseo import score
         self.assertEqual(score.dfs_findings(self.CRAWL, {"keywords": {}}, None), [])
         self.assertEqual(score.dfs_findings(self.CRAWL, {"keywords": {}}, self.dfs([])), [])
+
+
+def _fixture_audit() -> dict:
+    """Audit minimal complet, reutilise par les tests de l'explorateur."""
+    t = RenderTests("test_all_formats")
+    t.setUp() if hasattr(t, "setUp") else None
+    tmp, _ = t.build()
+    return json.loads((tmp / "audit.json").read_text())
+
+
+class ExplorateurTests(unittest.TestCase):
+    """FR: l'explorateur ne recalcule rien, il ouvre audit.json."""
+
+    def test_charge_utile_complete(self):
+        from jevseo.report import explorer
+        data = _fixture_audit()
+        p = explorer.payload(data)
+        self.assertTrue(p["pages"], "au moins une page")
+        self.assertIn("libelles", p)
+        self.assertIn("bandes", p)
+        page = p["pages"][0]
+        for champ in ("url", "chemin", "titre", "mots", "jev", "actions", "extrait"):
+            self.assertIn(champ, page)
+
+    def test_libelles_courts_pour_les_colonnes(self):
+        """Une colonne affiche « Article », pas la phrase de critere entiere."""
+        from jevseo.report import explorer
+        lib = explorer._libelles()
+        self.assertEqual(lib["page_type"]["courts"]["article_or_guide"], "Article")
+        self.assertEqual(lib["intent"]["courts"]["commercial"], "Commerciale")
+        # la phrase complete reste disponible pour le detail
+        self.assertGreater(len(lib["page_type"]["criteres"]["article_or_guide"]), 20)
+
+    def test_fichier_autonome_et_sans_cdn(self):
+        from jevseo.report.explorer import write_explorer
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        out = write_explorer(_fixture_audit(), tmp / "explorer.html")
+        html = out.read_text()
+        self.assertIn("<!doctype html>", html.lower())
+        self.assertNotIn("__DATA__", html, "les donnees doivent etre injectees")
+        # Aucune balise script/link/img ne doit pointer vers un hote distant :
+        # le fichier doit s'ouvrir hors ligne, chez le client, sans rien charger.
+        externes = re.findall(r'<(?:script|link|img)[^>]*(?:src|href)\s*=\s*["\']https?://[^"\']+', html, re.I)
+        self.assertEqual(externes, [], f"dependances externes : {externes}")
+        self.assertIn('"pages"', html)
+        self.assertIn("file://", html, "les polices sont embarquees en local")

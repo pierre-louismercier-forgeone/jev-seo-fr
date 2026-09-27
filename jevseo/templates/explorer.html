@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Explorateur d'audit</title>
+<style>
+/*__FONTS__*/
+:root{
+  --paper:#FBFCFE; --panel:#F5F7FB; --line:#E4E9F2; --ink:#0A0E17; --ink2:#3D4657; --muted:#8A93A6;
+  --bleu:#075CD8; --bleu-fonce:#0546A6; --bleu-clair:#EDF3FE; --halo:rgba(7,92,216,.10);
+  --critique:#C8322F; --eleve:#E0722F; --moyen:#D9A21B; --faible:#6E86A8; --bon:#128A5B;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--bleu);text-decoration:none}
+a:hover{text-decoration:underline}
+
+header{border-bottom:1px solid var(--line);padding:18px 24px;display:flex;gap:24px;align-items:baseline;flex-wrap:wrap;position:sticky;top:0;background:var(--paper);z-index:20}
+header .dom{font-size:20px;font-weight:700}
+header .kick{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--bleu)}
+.score{margin-left:auto;display:flex;gap:20px;align-items:baseline}
+.score b{font-size:26px;font-family:"JetBrains Mono",monospace}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-size:11px;font-family:"JetBrains Mono",monospace;background:#fff;white-space:nowrap}
+.chip.critique{border-color:var(--critique);color:var(--critique)}
+.chip.eleve{border-color:var(--eleve);color:var(--eleve)}
+.chip.moyen{border-color:var(--moyen);color:#8a6a10}
+.chip.faible,.chip.info{border-color:var(--line);color:var(--muted)}
+.chip.jev{border-color:var(--bleu);color:var(--bleu);background:var(--bleu-clair)}
+.chip.rev{border-color:var(--moyen);color:#8a6a10;background:#FDF8E8}
+
+nav.onglets{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:61px;z-index:19}
+nav.onglets button{padding:11px 16px;border-bottom:2px solid transparent;color:var(--ink2);font-size:14px}
+nav.onglets button[aria-selected=true]{border-bottom-color:var(--bleu);color:var(--bleu);font-weight:600}
+
+main{display:grid;grid-template-columns:238px minmax(0,1fr);gap:0;align-items:start}
+aside{border-right:1px solid var(--line);padding:18px 16px 60px;position:sticky;top:98px;max-height:calc(100vh - 98px);overflow:auto}
+aside h3{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 7px}
+aside h3:first-child{margin-top:0}
+aside label{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;color:var(--ink2);cursor:pointer}
+aside label:hover{color:var(--ink)}
+aside .n{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--muted)}
+aside input[type=search]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;font:inherit;font-size:13px}
+.reset{margin-top:18px;font-size:12px;color:var(--bleu)}
+
+section.corps{padding:18px 24px 80px;min-width:0}
+.barre{display:flex;gap:14px;align-items:baseline;margin-bottom:12px;flex-wrap:wrap}
+.barre .cnt{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--muted)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap;position:sticky;top:98px;background:var(--paper);z-index:5}
+th.num,td.num{text-align:right;font-family:"JetBrains Mono",monospace;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bleu-clair)}
+tbody tr.sel{background:var(--bleu-clair);box-shadow:inset 3px 0 0 var(--bleu)}
+td.chemin{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-dot{color:var(--moyen)}
+
+.jauge{display:inline-block;width:46px;height:5px;border-radius:3px;background:var(--line);vertical-align:middle;margin-right:6px;overflow:hidden}
+.jauge i{display:block;height:100%;background:var(--bleu)}
+.jauge.bas i{background:var(--critique)}
+.jauge.moyen i{background:var(--moyen)}
+
+dialog{border:0;border-radius:12px;padding:0;width:min(940px,94vw);max-height:90vh;box-shadow:0 0 0 1px var(--line),0 24px 60px var(--halo)}
+dialog::backdrop{background:rgba(10,14,23,.34)}
+.det{display:grid;grid-template-columns:minmax(0,1fr) 320px;max-height:90vh}
+.det .g{padding:22px 24px;overflow:auto}
+.det .d{padding:22px 20px;border-left:1px solid var(--line);background:var(--panel);overflow:auto}
+.det h2{font-size:17px;margin-bottom:3px}
+.det .u{font-size:12px;color:var(--muted);word-break:break-all;margin-bottom:16px}
+.ferme{position:absolute;right:14px;top:12px;font-size:22px;color:var(--muted);line-height:1}
+
+.q{border-top:1px solid var(--line);padding:12px 0}
+.q:first-of-type{border-top:0}
+.qh{display:flex;gap:9px;align-items:baseline;margin-bottom:3px}
+.qh b{font-size:13.5px}
+.qh .v{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:13px}
+.qq{font-size:12px;color:var(--muted);margin-bottom:7px}
+.probs{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.pr{display:grid;grid-template-columns:20px 1fr 42px;gap:7px;align-items:center;font-size:12px}
+.pr .bar{height:14px;background:var(--line);border-radius:3px;overflow:hidden}
+.pr .bar i{display:block;height:100%;background:var(--bleu);opacity:.32}
+.pr.top .bar i{opacity:1}
+.pr .lbl{color:var(--ink2)}
+.pr.top .lbl{color:var(--ink);font-weight:600}
+.pr .p{text-align:right;font-family:"JetBrains Mono",monospace;color:var(--muted)}
+
+.fait{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.fait span{color:var(--muted)}
+.fait b{font-family:"JetBrains Mono",monospace;font-weight:500;text-align:right}
+.extrait{margin-top:12px;font-size:12.5px;color:var(--ink2);white-space:pre-wrap;max-height:260px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:7px;padding:10px}
+
+.acts{display:flex;flex-direction:column;gap:0}
+.act{border-bottom:1px solid var(--line);padding:13px 0}
+.act .t{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.act .t b{font-size:14.5px}
+.act .id{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--bleu)}
+.act .ev{font-size:12.5px;color:var(--ink2);margin-top:5px}
+.act .fx{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.act .imp{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--muted)}
+.vide{padding:44px 0;text-align:center;color:var(--muted);font-size:14px}
+.note{font-size:12px;color:var(--muted);margin-top:22px;padding-top:12px;border-top:1px solid var(--line);max-width:74ch}
+@media(max-width:900px){main{grid-template-columns:1fr}aside{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}th{position:static}.det{grid-template-columns:1fr}.det .d{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="kick">Explorateur d'audit</div><div class="dom" id="dom"></div></div>
+  <div class="score"><span class="mono" id="meta"></span><span>Score <b id="sc"></b><span id="gr" style="color:var(--muted)"></span></span></div>
+</header>
+<nav class="onglets" role="tablist">
+  <button role="tab" aria-selected="true" data-o="pages">Pages</button>
+  <button role="tab" aria-selected="false" data-o="actions">Actions</button>
+  <button role="tab" aria-selected="false" data-o="scores">Notes</button>
+</nav>
+<main>
+  <aside id="rail"></aside>
+  <section class="corps"><div id="vue"></div></section>
+</main>
+<dialog id="dlg"><button class="ferme" onclick="dlg.close()">×</button><div class="det" id="det"></div></dialog>
+<script>
+const D = "__DATA__";
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = v => Math.round(v*100)+"%";
+
+const SCORES = ["helpfulness","specificity","trust","citable","title_fit","meta_fit","preuve_locale"];
+const COLS = [
+  {k:"chemin", t:"Page", cls:"chemin"},
+  {k:"page_type", t:"Type", jev:1},
+  {k:"intent", t:"Intention", jev:1},
+  {k:"importance", t:"Import.", jev:1, num:1},
+  {k:"helpfulness", t:"Utilité", jev:1, num:1},
+  {k:"specificity", t:"Spécif.", jev:1, num:1},
+  {k:"trust", t:"Confiance", jev:1, num:1},
+  {k:"citable", t:"Citab.", jev:1, num:1},
+  {k:"mots", t:"Mots", num:1},
+];
+
+let F = {q:"", page_type:new Set(), intent:new Set(), action:new Set(), rev:false, act:false};
+let tri = {k:"importance", desc:true}, onglet="pages", sel=null;
+
+const val = (p,k)=>{const a=p.jev[k]; if(!a) return null; return a.type==="choice"?a.value:a.value;};
+// Libelle court pour les tableaux et les filtres, phrase complete dans le detail.
+const lbl = (qid,v)=>{const L=D.libelles[qid]||{}; return (L.courts&&L.courts[v]) || v;};
+const desc = (qid,v)=>{const L=D.libelles[qid]||{}; const c=L.criteres; return (c&&!Array.isArray(c)&&c[v])||"";};
+
+function filtrees(){
+  return D.pages.filter(p=>{
+    if(F.q){const q=F.q.toLowerCase(); if(!((p.chemin+" "+(p.titre||"")+" "+(p.h1||"")).toLowerCase().includes(q))) return false;}
+    for(const k of ["page_type","intent","action"]) if(F[k].size && !F[k].has(val(p,k))) return false;
+    if(F.rev && !Object.values(p.jev).some(a=>a.band==="review")) return false;
+    if(F.act && !p.actions.length) return false;
+    return true;
+  });
+}
+function compte(k){const m={}; for(const p of D.pages){const v=val(p,k); if(v!=null) m[v]=(m[v]||0)+1;} return m;}
+
+function rail(){
+  if(onglet!=="pages"){$("#rail").innerHTML=""; return;}
+  let h = `<h3>Rechercher</h3><input type="search" id="q" placeholder="chemin, titre, H1" value="${esc(F.q)}">`;
+  for(const [k,t] of [["page_type","Type de page"],["intent","Intention"],["action","Verdict Jev"]]){
+    const c=compte(k); const cles=Object.keys(c).sort((a,b)=>c[b]-c[a]);
+    if(!cles.length) continue;
+    h += `<h3>${t}</h3>`;
+    for(const v of cles) h += `<label><input type="checkbox" data-f="${k}" value="${esc(v)}" ${F[k].has(v)?"checked":""}><span>${esc(lbl(k,v))}</span><span class="n">${c[v]}</span></label>`;
+  }
+  h += `<h3>Filtres</h3>
+    <label><input type="checkbox" id="rev" ${F.rev?"checked":""}><span>Au moins une réponse à vérifier</span></label>
+    <label><input type="checkbox" id="act" ${F.act?"checked":""}><span>Porte au moins une action</span></label>
+    <div class="reset"><button onclick="raz()">Tout réinitialiser</button></div>`;
+  $("#rail").innerHTML=h;
+  $("#q").oninput=e=>{F.q=e.target.value; rendu(false);};
+  $("#rail").querySelectorAll("[data-f]").forEach(el=>el.onchange=()=>{
+    const s=F[el.dataset.f]; el.checked?s.add(el.value):s.delete(el.value); rendu();});
+  $("#rev").onchange=e=>{F.rev=e.target.checked; rendu();};
+  $("#act").onchange=e=>{F.act=e.target.checked; rendu();};
+}
+function raz(){F={q:"",page_type:new Set(),intent:new Set(),action:new Set(),rev:false,act:false}; rendu();}
+
+function cellule(p,c){
+  if(!c.jev) return c.k==="chemin" ? esc(p.chemin) : (p[c.k]??"");
+  const a=p.jev[c.k];
+  if(!a) return `<span style="color:var(--muted)">—</span>`;
+  const rev = a.band==="review" ? ` <span class="rev-dot" title="à vérifier">●</span>` : "";
+  if(a.type==="choice") return esc(lbl(c.k,a.value))+rev;
+  const cl = a.value<.45?"bas":a.value<.66?"moyen":"";
+  return `<span class="jauge ${cl}"><i style="width:${Math.round(a.value*100)}%"></i></span>${a.value.toFixed(2)}${rev}`;
+}
+
+function vuePages(){
+  const rows=filtrees();
+  rows.sort((x,y)=>{
+    const a=tri.k in x?x[tri.k]:val(x,tri.k), b=tri.k in y?y[tri.k]:val(y,tri.k);
+    if(a==null) return 1; if(b==null) return -1;
+    return (a<b?-1:a>b?1:0)*(tri.desc?-1:1);
+  });
+  const rev=rows.filter(p=>Object.values(p.jev).some(a=>a.band==="review")).length;
+  let h=`<div class="barre"><span class="cnt">${rows.length} page${rows.length>1?"s":""} sur ${D.pages.length}</span>
+    <span class="cnt">·</span><span class="cnt">${rev} avec au moins une réponse à vérifier</span></div>
+    <table><thead><tr>`;
+  for(const c of COLS) h+=`<th data-k="${c.k}" class="${c.num?"num":""}">${c.t}${tri.k===c.k?(tri.desc?" ↓":" ↑"):""}</th>`;
+  h+=`<th class="num">Actions</th></tr></thead><tbody>`;
+  for(const p of rows){
+    h+=`<tr data-u="${esc(p.url)}" class="${sel===p.url?"sel":""}">`;
+    for(const c of COLS) h+=`<td class="${c.num?"num":""} ${c.cls||""}" ${c.k==="chemin"?`title="${esc(p.url)}"`:""}>${cellule(p,c)}</td>`;
+    h+=`<td class="num">${p.actions.length||""}</td></tr>`;
+  }
+  h+=`</tbody></table>`;
+  if(!rows.length) h=`<div class="vide">Aucune page ne correspond à ces filtres.</div>`;
+  h+=`<p class="note">Une pastille <span class="rev-dot">●</span> marque une réponse hors bande décisive : Jev n'a pas tranché, la valeur est un signal à vérifier, pas un constat. Seuils : ${D.bandes.act} de confiance pour un choix ou un score, ${D.bandes.yes} ou ${D.bandes.no} pour une question fermée.</p>`;
+  return h;
+}
+
+function vueActions(){
+  let h=`<div class="barre"><span class="cnt">${D.actions.length} actions, par impact décroissant</span></div><div class="acts">`;
+  for(const a of D.actions){
+    h+=`<div class="act"><div class="t"><span class="id">${a.id}</span><b>${esc(a.titre)}</b>
+      <span class="chip ${a.gravite==="critical"?"critique":a.gravite==="high"?"eleve":a.gravite==="medium"?"moyen":"faible"}">${a.gravite}</span>
+      <span class="chip">${a.priorite}</span>
+      ${a.origine==="jev"?'<span class="chip jev">jugé par Jev</span>':a.origine==="dataforseo"?'<span class="chip">DataForSEO</span>':'<span class="chip">règle</span>'}
+      ${a.heuristique?'<span class="chip">heuristique</span>':""}
+      ${a.a_verifier?`<span class="chip rev">${a.a_verifier} à vérifier</span>`:""}
+      <span class="imp">impact ${a.impact} · ${a.pages} page${a.pages>1?"s":""}</span></div>
+      <div class="ev"><b>Preuve :</b> ${esc(a.preuve)}</div>
+      <div class="fx"><b>Correctif :</b> ${esc(a.correctif)} <a href="${esc(a.source)}" target="_blank" rel="noopener">source</a></div></div>`;
+  }
+  return h+`</div>`;
+}
+
+function vueScores(){
+  let h=`<div class="barre"><span class="cnt">Score global ${D.score} sur 100, note ${D.note}</span></div><table><thead><tr>
+    <th>Domaine</th><th class="num">Note</th><th class="num">Poids</th><th>Mode de calcul</th></tr></thead><tbody>`;
+  for(const [c,n] of Object.entries(D.noms)){
+    const v=D.categories[c];
+    h+=`<tr style="cursor:default"><td>${esc(n)}</td><td class="num">${v==null?"n/a":v}</td><td class="num">${D.poids[c]}</td><td style="font-size:12.5px;color:var(--ink2)">${esc(D.notes_calcul[c]||"")}</td></tr>`;
+  }
+  h+=`</tbody></table>`;
+  if(D.plafonds.length) h+=`<p class="note"><b>Plafonds appliqués :</b> ${D.plafonds.map(esc).join(" ; ")}</p>`;
+  if(D.partiel.length) h+=`<p class="note"><b>Audit partiel :</b> ${D.partiel.map(esc).join(" ; ")}.</p>`;
+  const l=D.ledger;
+  h+=`<p class="note">Jev : modèle ${esc(l.model_returned||"n/a")} via ${esc(l.provider||"n/a")}, ${l.requests||0} requêtes, ${(l.input_tokens||0).toLocaleString("fr-FR")} jetons d'entrée, ${l.failed||0} en échec, coût ${(l.billed_usd??l.cost_usd??0).toFixed(4)} $. Questions posées en ${D.langue_questions==="fr"?"français":"anglais"} ; les critères sont affichés en français.</p>`;
+  return h;
+}
+
+function detail(url){
+  const p=D.pages.find(x=>x.url===url); if(!p) return;
+  sel=url;
+  let g=`<h2>${esc(p.titre||p.chemin)}</h2><div class="u"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.url)}</a></div>`;
+  const ordre=["page_type","intent","action","importance","helpfulness","specificity","trust","citable","preuve_locale","contact_local","answer_first","clear_next_step","title_fit","meta_fit","h1_fit"];
+  const qs=ordre.filter(k=>p.jev[k]);
+  if(!qs.length) g+=`<div class="vide">Cette page n'a pas été jugée par Jev.</div>`;
+  for(const k of qs){
+    const a=p.jev[k], L=D.libelles[k]||{};
+    const aff = a.type==="choice" ? esc(lbl(k,a.value))
+      : a.type==="noul" ? `P(oui) ${a.value.toFixed(2)}`
+      : `${a.value.toFixed(2)}`;
+    g+=`<div class="q"><div class="qh"><b>${esc((L.question||k).replace(/^Traite le contenu[^.]*\.\s*/,"").replace(/^[A-ZÀ-Þ]/,c=>c))}</b>
+      <span class="chip ${a.band==="review"?"rev":"jev"}">${a.band==="review"?"à vérifier":"décisif"}</span>
+      <span class="v">${aff}</span></div>`;
+    if(a.confidence!=null) g+=`<div class="qq">confiance ${a.confidence.toFixed(2)}${a.side_probability!=null?` · probabilité du côté ${a.side_probability.toFixed(2)}`:""}</div>`;
+    if(a.probabilities){
+      const ent=Object.entries(a.probabilities).sort((x,y)=>y[1]-x[1]);
+      const max=ent[0][1];
+      g+=`<div class="probs">`;
+      for(const [cle,v] of ent){
+        if(v<0.005 && ent.length>4) continue;
+        const nom = a.type==="score" ? ((L.criteres||[])[+cle]||`niveau ${cle}`)
+          : (lbl(k,cle) + (desc(k,cle)?` — ${desc(k,cle)}`:""));
+        g+=`<div class="pr ${v===max?"top":""}"><span class="p">${a.type==="score"?cle:""}</span><span class="lbl">${esc(nom)}</span><span class="bar"><i style="width:${Math.round(v*100)}%"></i></span><span class="p">${pct(v)}</span></div>`;
+      }
+      g+=`</div>`;
+    }
+    g+=`</div>`;
+  }
+  let d=`<div class="fait"><span>Mots</span><b>${p.mots??"—"}</b></div>
+    <div class="fait"><span>Profondeur</span><b>${p.profondeur??"—"}</b></div>
+    <div class="fait"><span>Liens entrants</span><b>${p.liens_entrants}</b></div>
+    <div class="fait"><span>TTFB</span><b>${p.ttfb?p.ttfb+" ms":"—"}</b></div>
+    <div class="fait"><span>Poids HTML</span><b>${p.ko} Ko</b></div>
+    <div class="fait"><span>Dans le sitemap</span><b>${p.sitemap?"oui":"non"}</b></div>`;
+  if(p.h1) d+=`<div class="fait"><span>H1</span><b style="text-align:right;font-weight:400">${esc(p.h1)}</b></div>`;
+  if(p.contact && (p.contact.telephones||[]).length) d+=`<div class="fait"><span>Téléphone vu</span><b>${esc(p.contact.telephones[0])}</b></div>`;
+  if(p.actions.length) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Actions sur cette page</h3>`+
+    p.actions.map(id=>{const a=D.actions.find(x=>x.id===id);return `<div class="fait"><span class="mono" style="color:var(--bleu)">${id}</span><b style="text-align:right;font-weight:400">${esc(a?a.titre:"")}</b></div>`;}).join("");
+  if(p.ouverture) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Ouverture, après le H1</h3><div class="extrait" style="max-height:120px">${esc(p.ouverture)}</div>`;
+  if(p.extrait) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Texte lu par Jev</h3><div class="extrait">${esc(p.extrait)}${p.extrait_tronque?"\n\n[…] extrait tronqué":""}</div>`;
+  $("#det").innerHTML=`<div class="g">${g}</div><div class="d">${d}</div>`;
+  $("#dlg").showModal();
+}
+
+function rendu(refaireRail=true){
+  $("#vue").innerHTML = onglet==="pages"?vuePages():onglet==="actions"?vueActions():vueScores();
+  if(refaireRail) rail();
+  if(onglet==="pages"){
+    $("#vue").querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
+      tri = tri.k===th.dataset.k ? {k:tri.k,desc:!tri.desc} : {k:th.dataset.k,desc:true}; rendu(false);});
+    $("#vue").querySelectorAll("tbody tr[data-u]").forEach(tr=>tr.onclick=()=>detail(tr.dataset.u));
+  }
+}
+
+$("#dom").textContent=D.domaine;
+$("#sc").textContent=D.score;
+$("#gr").textContent=" / 100 · "+D.note;
+$("#meta").textContent=`${D.date} · ${D.pages.length} pages · ${D.actions.length} actions${D.dfs?" · DataForSEO":""}`;
+document.title=`Explorateur · ${D.domaine}`;
+document.querySelectorAll("nav.onglets button").forEach(b=>b.onclick=()=>{
+  onglet=b.dataset.o;
+  document.querySelectorAll("nav.onglets button").forEach(x=>x.setAttribute("aria-selected", x===b));
+  rendu();});
+rendu();
+</script>
+</body>
+</html>

@@ -536,3 +536,38 @@ def franciser_questions(questions: dict) -> dict:
                 neuf["criteria"] = {k: criteres.get(k, v) for k, v in q["criteria"].items()}
         sortie[qid] = neuf
     return sortie
+
+
+# ------------------------------------------- 8. libelles courts (explorateur)
+#
+# Les criteres decrivent la categorie en une phrase, ce qu'il faut a Jev pour
+# trancher mais pas a un humain qui lit un tableau. L'explorateur montre le
+# libelle court en colonne et garde la phrase complete dans le detail.
+
+LIBELLES_COURTS = {
+    "page_type": {
+        "homepage": "Accueil", "product_or_service": "Prestation", "category_or_listing": "Liste",
+        "article_or_guide": "Article", "about_or_team": "À propos", "contact_or_location": "Contact",
+        "pricing": "Tarifs", "case_study_or_proof": "Référence", "support_or_docs": "Aide",
+        "realisations_ou_chantiers": "Réalisations", "zone_intervention": "Zone",
+        "mentions_legales": "Mentions légales", "recrutement": "Recrutement",
+        "legal_or_policy": "Juridique", "other": "Autre", "unclear": "Indécidable",
+    },
+    "intent": {
+        "informational": "Informationnelle", "commercial": "Commerciale",
+        "transactional": "Transactionnelle", "navigational": "Navigationnelle",
+        "local": "Locale", "unclear": "Indécidable",
+    },
+    "action": {
+        "keep_or_improve": "Garder", "rewrite": "Réécrire",
+        "merge_or_remove": "Fusionner ou retirer", "unclear": "Indécidable",
+    },
+    "business_model": {
+        "artisan_batiment": "Artisan du bâtiment", "profession_reglementee": "Profession réglementée",
+        "service_pro_local": "Service pro local", "commerce_local": "Commerce local",
+        "ecommerce": "E-commerce", "saas_ou_logiciel": "SaaS", "agence_ou_b2b": "Agence B2B",
+        "industrie_ou_btp": "Industrie / BTP", "media_ou_editeur": "Média",
+        "formation_ou_communaute": "Formation", "association_ou_public": "Association",
+        "personnel_ou_portfolio": "Portfolio", "other": "Autre", "unclear": "Indécidable",
+    },
+}
