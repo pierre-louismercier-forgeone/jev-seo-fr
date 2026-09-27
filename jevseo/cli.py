@@ -295,8 +295,11 @@ def main(argv=None) -> None:
         p.add_argument("--psi-pages", type=int, default=3, help="pages measured with PageSpeed Insights")
         p.add_argument("--no-psi", action="store_true")
         p.add_argument("--full", action="store_true", help="add DataForSEO rankings, keywords, competitors, backlinks, SERPs and AI mentions (paid per call)")
-        p.add_argument("--location-code", type=int, default=2840, help="DataForSEO location code (2840 = United States)")
-        p.add_argument("--language", default="en", help="DataForSEO language code")
+        # FR: l'upstream part sur 2840 (Etats-Unis) et "en". Sur un site
+        # francais cela mesure le mauvais marche en silence : positions,
+        # volumes et SERP live seraient ceux d'un autre pays. Defaut France.
+        p.add_argument("--location-code", type=int, default=2250, help="code de zone DataForSEO (2250 = France, 2056 = Belgique, 2756 = Suisse, 2840 = Etats-Unis)")
+        p.add_argument("--language", default="fr", help="code de langue DataForSEO (fr par defaut)")
         p.add_argument("--dfs-budget", type=float, default=1.0, help="hard DataForSEO spend cap in USD")
         p.add_argument("--reuse-dfs", metavar="DIR", help="with --full: reuse DataForSEO data from an earlier audit folder of the same site (no new spend)")
 

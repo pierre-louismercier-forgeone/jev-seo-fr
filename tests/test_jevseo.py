@@ -729,3 +729,56 @@ class PageLocaleTests(unittest.TestCase):
         p_cas = dict(self.CAS_CLIENT[0], text_excerpt="x", word_count=300)
         self.assertIn("preuve_locale", jev.page_questions(p_ville, self.PAGES_VILLE))
         self.assertNotIn("preuve_locale", jev.page_questions(p_cas, self.CAS_CLIENT))
+
+
+class InvisibiliteTests(unittest.TestCase):
+    """FR: l'absence d'opportunite ne doit plus se noter comme l'absence de probleme.
+
+    Regression publi3.com : 11 requetes positionnees, toutes hors sujet et
+    au-dela de la 20e place. Aucune regle ne pouvait se declencher, donc rien
+    n'etait deduit, donc la visibilite sortait a 94/100 sur un site qui fait
+    5 visites estimees par mois.
+    """
+
+    def dfs(self, ranked):
+        return {"available": True, "ranked": ranked, "opportunities": [], "competitors": [],
+                "overview": {"etv": 5.0, "count": len(ranked)}, "backlinks": {}, "serps": [], "mentions": {}, "referring_domains": {}, "competitors_all": []}
+
+    def juges(self, pertinents, marques):
+        j = {}
+        for kw in pertinents:
+            j[kw] = {"relevance": {"value": 0.8, "band": "act"}, "other_brand": {"value": 0.1}}
+        for kw in marques:
+            j[kw] = {"relevance": {"value": 0.3, "band": "act"}, "other_brand": {"value": 0.9}}
+        return {"keywords": j, "pages": {}, "site": {}}
+
+    CRAWL = {"final_url": "https://x.fr/", "domain": "x.fr", "pages": []}
+
+    def test_se_declenche_quand_rien_n_est_dans_le_top_20(self):
+        from jevseo import score
+        ranked = [{"keyword": "marque mal ecrite", "position": 24, "volume": 590, "url": "https://x.fr/"},
+                  {"keyword": "evenement hors sujet", "position": 41, "volume": 260, "url": "https://x.fr/a"}]
+        f = score.dfs_findings(self.CRAWL, self.juges(["marque mal ecrite"], ["evenement hors sujet"]), self.dfs(ranked))
+        inv = [x for x in f if x["id"] == "dfs_invisible"]
+        self.assertEqual(len(inv), 1)
+        self.assertEqual(inv[0]["severity"], "critical")
+        self.assertIn("position 24", inv[0]["evidence"])
+
+    def test_ne_se_declenche_pas_avec_une_requete_metier_visible(self):
+        from jevseo import score
+        ranked = [{"keyword": "vitrophanie paris", "position": 7, "volume": 900, "url": "https://x.fr/v"},
+                  {"keyword": "evenement hors sujet", "position": 41, "volume": 260, "url": "https://x.fr/a"}]
+        f = score.dfs_findings(self.CRAWL, self.juges(["vitrophanie paris"], ["evenement hors sujet"]), self.dfs(ranked))
+        self.assertEqual([x for x in f if x["id"] == "dfs_invisible"], [])
+
+    def test_une_requete_de_marque_tierce_dans_le_top_20_ne_sauve_pas(self):
+        """Etre 3e sur le nom d'un concurrent n'est pas de la visibilite metier."""
+        from jevseo import score
+        ranked = [{"keyword": "concurrent sa", "position": 3, "volume": 900, "url": "https://x.fr/a"}]
+        f = score.dfs_findings(self.CRAWL, self.juges([], ["concurrent sa"]), self.dfs(ranked))
+        self.assertEqual(len([x for x in f if x["id"] == "dfs_invisible"]), 1)
+
+    def test_sans_donnees_dataforseo_la_regle_reste_muette(self):
+        from jevseo import score
+        self.assertEqual(score.dfs_findings(self.CRAWL, {"keywords": {}}, None), [])
+        self.assertEqual(score.dfs_findings(self.CRAWL, {"keywords": {}}, self.dfs([])), [])

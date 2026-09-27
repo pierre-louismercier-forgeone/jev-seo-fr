@@ -46,6 +46,14 @@ DFS_RULES = {
     "dfs_existing_page": ("visibility", "medium", "Mots cles pertinents qu'une page existante pourrait gagner", "Etoffez la page indiquee pour couvrir le besoin de chaque mot cle, puis liez-la depuis les pages connexes.", "dfs_labs", 2),
     "dfs_new_page": ("visibility", "medium", "Mots cles pertinents sans page pour se positionner", "Prevoyez une page par besoin de recherche distinct ; commencez par les mots cles au volume le plus fort et a la difficulte la plus faible.", "dfs_labs", 3),
     "dfs_backlink_gap": ("visibility", "medium", "Bien moins de domaines referents que les sites positionnes sur les memes mots cles", "Gagnez des liens depuis les sites que votre audience lit deja : donnees originales, outils, expertise invitee et pages partenaires.", "dfs_backlinks", 4),
+    # FR: l'absence d'opportunite etait notee comme l'absence de probleme.
+    # Sur publi3.com, 11 mots cles positionnes mais tous hors sujet et au-dela
+    # de la 20e place : aucune regle ne pouvait se declencher (dfs_striking
+    # exige une position entre 4 et 20, les regles d'opportunite exigent une
+    # pertinence jugee), donc rien n'etait deduit et la visibilite sortait a
+    # 94/100 sur un site qui fait 5 visites estimees par mois. Un tel chiffre
+    # dans un livrable client detruit la credibilite du rapport.
+    "dfs_invisible": ("visibility", "critical", "Aucune requete metier dans le top 20", "Le site ne se positionne sur aucune recherche liee a son activite, en premiere ou deuxieme page. Avant toute optimisation, il faut creer les pages qui repondent aux intentions commerciales du metier : une page par prestation, puis une page par couple prestation x cible ou prestation x zone.", "dfs_labs", 4),
     "dfs_broken_backlinks": ("visibility", "medium", "Backlinks pointant vers des pages cassees", "Redirigez chaque cible cassee vers la page vivante la plus proche pour que ces liens comptent a nouveau.", "dfs_backlinks", 1),
     "dfs_aio_not_cited": ("ai", "low", "Apercus IA qui ne citent pas le site", "Regardez qui est cite aujourd'hui et assurez-vous que la page repond directement a la recherche. Google indique qu'aucune exigence supplementaire n'existe pour apparaitre dans les Apercus IA au-dela de l'eligibilite normale a la recherche.", "ai", 2),
 }
@@ -185,7 +193,25 @@ def dfs_findings(crawl: dict, judged: dict, dfs: dict | None) -> list[dict]:
     def opportunity(k):
         return opportunity_key(k)
 
-    striking = [k for k in dfs.get("ranked") or [] if k.get("position") and 4 <= k["position"] <= 20 and (rel(k["keyword"]) or 0) >= 0.5 and not other_brand(k["keyword"])]
+    # FR: mesure de la visibilite REELLE, avant toute regle d'amelioration.
+    # Une requete ne vaut que si elle est dans le top 20, pertinente pour le
+    # metier, et pas une recherche de marque tierce.
+    ranked_all = dfs.get("ranked") or []
+    visibles = [k for k in ranked_all
+                if k.get("position") and k["position"] <= 20
+                and (rel(k["keyword"]) or 0) >= 0.5 and not other_brand(k["keyword"])]
+    if ranked_all and not visibles:
+        pertinents = [k for k in ranked_all if (rel(k["keyword"]) or 0) >= 0.5 and not other_brand(k["keyword"])]
+        meilleure = min((k["position"] for k in pertinents if k.get("position")), default=None)
+        etv = (dfs.get("overview") or {}).get("etv")
+        preuve = (f"{len(ranked_all)} requetes positionnees, dont {len(pertinents)} jugees pertinentes par Jev et hors marque tierce ; "
+                  + (f"la meilleure est en position {meilleure}" if meilleure else "aucune n'est positionnee")
+                  + (f" ; trafic organique estime {round(etv)} visites/mois" if etv is not None else ""))
+        out.append(dfs_finding("dfs_invisible", [home], len(ranked_all), preuve,
+                               {"ranked_total": len(ranked_all), "pertinents": len(pertinents),
+                                "meilleure_position": meilleure, "etv": etv}, 0))
+
+    striking = [k for k in ranked_all if k.get("position") and 4 <= k["position"] <= 20 and (rel(k["keyword"]) or 0) >= 0.5 and not other_brand(k["keyword"])]
     if striking:
         striking.sort(key=opportunity, reverse=True)
         out.append(dfs_finding("dfs_striking", sorted({k["url"] for k in striking if k.get("url")}) or [home], len(striking),
@@ -319,6 +345,14 @@ def score(crawl: dict, findings: list[dict], judged: dict, perf: dict | None, df
     elif "no_https" in ids:
         overall = min(overall, 60)
         caps.append("Capped at 60: the site is not reliably served over HTTPS")
+    # FR: la note de visibilite est une deduction a partir de 100, donc un site
+    # sans aucune visibilite la conserve faute de constat a deduire. On plafonne
+    # la categorie elle-meme, pas seulement le score global.
+    if "dfs_invisible" in ids and cats.get("visibility") is not None:
+        cats["visibility"] = min(cats["visibility"], 15)
+        caps.append("Visibilite plafonnee a 15 : aucune requete metier dans le top 20")
+        available = {c: v for c, v in cats.items() if v is not None}
+        overall = sum(v * CATEGORY_WEIGHT[c] for c, v in available.items()) / sum(CATEGORY_WEIGHT[c] for c in available)
     overall = round(overall)
     # A score built without Jev or PageSpeed leaves whole areas unassessed; say so wherever it appears.
     partial = [reason for missing, reason in ((not any(jp.values()), "jugements Jev indisponibles, la qualite du contenu n'a donc pas ete evaluee"),
