@@ -226,7 +226,7 @@ def page_questions(p: dict) -> dict:
             "The main heading names what the page is about",
             "The main heading is a slogan, a generic word, or about something else",
         )
-    return q
+    return _langue(q)
 
 
 def opening(p: dict) -> str:
@@ -235,6 +235,17 @@ def opening(p: dict) -> str:
     h1 = (p.get("h1") or [""])[0]
     i = text.find(h1) if h1 else -1
     return (text[i + len(h1):] if i >= 0 else text).strip()[:500]
+
+
+def _langue(questions: dict) -> dict:
+    """Applique JEVSEO_QUESTIONS_LANG. Anglais par defaut, mesure a l'appui.
+
+    A/B du 27 septembre 2026 sur clw.fr, 30 pages jugees deux fois, 434 couples
+    de reponses : l'anglais est decisif a 76 %, le francais a 65 %, avec 92 %
+    d'accord. Le francais n'est plus decisif sur aucune question. L'ecart se
+    concentre sur `page_type` (93 % contre 27 %). Voir scripts/ab_langue.py.
+    """
+    return fr.franciser_questions(questions) if fr.LANGUE_QUESTIONS == "fr" else questions
 
 
 def page_state(p: dict, site_ctx: dict) -> dict:
@@ -267,7 +278,7 @@ BUSINESS_MODELS = fr.MODELES_ENTREPRISE
 
 
 def site_questions() -> dict:
-    return {
+    return _langue({
         "business_model": choice("Which kind of organisation runs the website in `homepage`?", BUSINESS_MODELS),
         "value_prop": score(
             "How clearly does `homepage` tell a first-time visitor what is offered, to whom, and why choose it?",
@@ -297,7 +308,7 @@ def site_questions() -> dict:
             "It names a service area, address or local customers",
             "It serves customers regardless of location or does not say",
         ),
-    }
+    })
 
 
 def site_state(home: dict, pages: list[dict]) -> dict:

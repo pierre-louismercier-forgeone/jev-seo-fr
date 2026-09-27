@@ -206,38 +206,78 @@ seul constat eleve de l'audit), `jev_coordonnees_locales`, plus
 `jev_local_schema`, `jev_specificity`, `jev_trust`, `jev_meta_fit` et
 `jev_answer_first`. Score 89 (B, partiel), 15 actions.
 
-## La langue des questions reste un point ouvert
+## La langue des questions : tranche par la mesure
 
-La doc TypeSafe dit que **l'anglais est la langue la plus forte de Jev**, et le
-contenu juge est francais dans les deux cas. Traduire les questions deplace
-donc les *instructions* vers la langue faible du modele sans rien changer a la
-langue du contenu : cela peut degrader sans rien gagner. Aucune mesure publique
-n'existe sur le francais.
+**Verdict : l'anglais, et l'ecart n'est pas marginal.**
 
-Les questions restent donc **en anglais par defaut**, avec un commutateur pour
-que l'A/B ne coute qu'une variable d'environnement :
+A/B du 27 septembre 2026 sur clw.fr. Meme corpus, memes cles de reponse, meme
+modele ; la seule variable est la langue de l'enonce. 30 pages jugees deux
+fois, 434 couples de reponses, 60 requetes, 0,0126 $.
+
+| Mesure | Anglais | Francais |
+|---|---|---|
+| Reponses decisives | **76 %** | 65 % |
+| Accord entre les deux variantes | 92 % | |
+
+**Le francais n'est plus decisif sur aucune question.** L'ecart se concentre
+sur trois d'entre elles :
+
+| Question | Decisif EN | Decisif FR | Accord |
+|---|---|---|---|
+| `page_type` | **93 %** | 27 % | 23 % |
+| `specificity` | 40 % | 10 % | 90 % |
+| `clear_next_step` | 77 % | 57 % | 100 % |
+| `intent` | 80 % | 60 % | 90 % |
+
+`page_type` s'effondre : en anglais le modele tranche `zone_intervention` sur
+les pages ville, en francais il hesite et bascule sur `product_or_service`.
+Les deux etiquettes se defendent (une page ville presente bien un service
+dans un lieu), mais 27 % de decisivite dit que la version francaise ne
+discrimine pas. La mesure ne dit pas laquelle a raison ; elle dit laquelle
+tranche.
+
+Ce protocole NE mesure PAS l'exactitude : il n'existe pas de corpus francais
+etiquete a la main. Un accord de 92 % signifie que les deux variantes lisent
+la meme chose, pas qu'elles lisent juste.
+
+Le commutateur reste en place et fonctionne de bout en bout, pour rejouer la
+mesure sur un autre corpus :
 
 ```sh
-JEVSEO_QUESTIONS_LANG=fr
+JEVSEO_QUESTIONS_LANG=fr        # defaut : en
+python scripts/ab_langue.py <dossier-audit> --pages 30
 ```
 
-Protocole de test, des qu'une cle TypeSafe est disponible : prendre 30 pages
-d'un site client deja audite, les etiqueter a la main, faire tourner les deux
-variantes, comparer les taux d'accord. Cout estime : quelques centimes.
+La traduction complete vit dans `fr.QUESTIONS_FR`. Les **cles** des criteres
+ne sont jamais traduites : elles sont lues par `score.py`, les rapports et le
+classeur. Seuls les enonces changent, ce qui est exactement ce qui rend l'A/B
+propre. Un test verrouille cette invariance.
+
+### Un constat de bord
+
+`answer_first` est indecis dans les deux langues (7 % et 3 %). Verification
+faite, `opening()` extrait correctement le texte apres le H1 : ce sont les
+ouvertures de clw.fr qui sont genuinement ambigues, un slogan suivi de
+libelles de menu (« Notre objectif : la defense de vos interets economiques.
+NOS SOLUTIONS Voir nos solutions »). La question n'est pas cassee, le contenu
+l'est. Le constat `jev_answer_first` est d'ailleurs emis, avec raison.
+
+Piste a creuser : les libelles de navigation qui bavent dans `text_excerpt`
+degradent le signal sur plusieurs questions.
 
 ## Ce qui n'est pas encore fait
 
-- L'A/B francais contre anglais des questions n'a pas encore tourne. On sait
-  desormais que l'anglais marche sur du contenu francais ; on ne sait pas si
-  le francais ferait mieux.
 - Un seul site teste, et il est bien construit. La regle `doorway_pages` n'a
   toujours pas ete vue se declencher sur un vrai site.
+- L'A/B de langue n'a tourne que sur un corpus. Le verdict est net, mais il
+  porte sur un site de service B2B national a pages ville ; un autre secteur
+  pourrait donner un ecart different.
 - Le PDF reste indisponible sur cette machine (Pango/GLib absents).
 - Les captures d'ecran de `docs/assets/` sont encore celles de l'upstream.
 
 ## Etat des tests
 
-`python -m unittest discover -s tests` : **53 tests, tous verts**, dont 15
+`python -m unittest discover -s tests` : **57 tests, tous verts**, dont 19
 nouveaux couvrant les correctifs francais. Les tests de rendu acceptent
 desormais `report.html` quand WeasyPrint est indisponible, et exigent toujours
 qu'un document soit produit.
