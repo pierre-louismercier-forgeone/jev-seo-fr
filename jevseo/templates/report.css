@@ -1,22 +1,26 @@
+/* Gabarit ForgeOne : near-white, filets 1px, un seul bleu, Figtree + JetBrains Mono. */
 @page {
   size: A4;
   margin: 16mm 15mm 17mm 15mm;
-  background: #fcfcfb;
-  @bottom-left { content: string(domain) "  ·  Jev SEO audit"; font: 7.5pt Inter, sans-serif; color: #898781; }
-  @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt Inter, sans-serif; color: #898781; }
+  background: #FBFCFE;
+  @bottom-left { content: string(domain) "  ·  Audit SEO ForgeOne"; font: 7.5pt Figtree, sans-serif; color: #8A93A6; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt "JetBrains Mono", monospace; color: #8A93A6; }
 }
 @page cover { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
 
 :root {
-  --paper: #fcfcfb; --panel: #f4f3ef; --line: #e1e0d9; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
-  --jev: #d45bb6; --jev-deep: #a83a8c; --jev-soft: #fbeaf5;
-  --critical: #d03b3b; --high: #ec835a; --medium: #fab219; --low: #8fb3d9; --good: #0ca30c;
+  /* Fond near-white et encres */
+  --paper: #FBFCFE; --panel: #F5F7FB; --line: #E4E9F2; --ink: #0A0E17; --ink2: #3D4657; --muted: #8A93A6;
+  /* Un seul bleu, et son halo */
+  --jev: #075CD8; --jev-deep: #0546A6; --jev-soft: #EDF3FE; --halo: rgba(7, 92, 216, 0.10);
+  /* Gravites : le bleu reste reserve a la marque, les gravites ont leur propre gamme */
+  --critical: #C8322F; --high: #E0722F; --medium: #D9A21B; --low: #6E86A8; --good: #128A5B;
 }
 * { box-sizing: border-box; }
-html { font-family: Inter, "DejaVu Sans", sans-serif; font-size: 9pt; color: var(--ink); line-height: 1.45; }
+html { font-family: Figtree, Inter, "DejaVu Sans", system-ui, sans-serif; font-size: 9pt; color: var(--ink); line-height: 1.45; }
 body { margin: 0; background: var(--paper); }
 .domain-string { string-set: domain content(); }
-h1, h2, h3, h4 { font-family: "Inter Display", Inter, sans-serif; margin: 0; letter-spacing: -0.01em; }
+h1, h2, h3, h4 { font-family: Figtree, Inter, system-ui, sans-serif; margin: 0; letter-spacing: -0.01em; }
 h2 { font-size: 20pt; font-weight: 700; margin-bottom: 3mm; }
 h3 { font-size: 11.5pt; font-weight: 650; margin: 5mm 0 2mm; }
 h4 { font-size: 9.5pt; font-weight: 650; margin: 0 0 1mm; }
@@ -111,7 +115,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .finding .fix b { color: var(--jev-deep); }
 .finding .urls { margin-top: 0.8mm; }
 
-/* Jev judgment cards */
+/* Cartes de jugement Jev */
 .jcards { display: flex; flex-wrap: wrap; gap: 3mm; }
 .jcard { width: calc(50% - 1.5mm); background: var(--ink); color: #fff; border-radius: 3mm; padding: 3.5mm; page-break-inside: avoid; }
 .jcard .q { font-size: 8pt; color: #c3c2b7; min-height: 7mm; }
@@ -162,3 +166,67 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 h2, h3 { page-break-after: avoid; }
 .sources { column-count: 2; column-gap: 6mm; font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace; font-size: 6.3pt; line-height: 1.5; }
 .sources a { display: block; word-break: break-all; }
+
+
+/* ------------------------------------------------ gabarit ForgeOne (fork) */
+
+/* Filets a 1px plutot que des bordures epaisses ou des ombres. */
+.card, .panel, table, .box, .tile { border-color: var(--line) !important; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 5mm 0; }
+
+/* Les chiffres et les etiquettes techniques passent en mono. */
+td.num, th.num, .metric, .score, .tag, .kpi, code, .mono,
+.action-id, .conf, .prob { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+/* Le halo, seul effet de profondeur autorise, reserve a l'element porteur. */
+.halo { box-shadow: 0 0 0 1px var(--line), 0 2mm 6mm var(--halo); }
+
+/* Sections numerotees. */
+.section { counter-increment: section; }
+.section > h2::before {
+  content: counter(section, decimal-leading-zero);
+  font-family: "JetBrains Mono", monospace; font-size: 10pt; font-weight: 500;
+  color: var(--jev); margin-right: 3mm; letter-spacing: 0.02em;
+}
+body { counter-reset: section; }
+
+/* Le bleu ne sert qu'a la marque et aux reperes, jamais a un etat de gravite. */
+.kicker { color: var(--jev); }
+a { color: var(--jev); }
+a:hover { color: var(--jev-deep); }
+
+/* Rendu ecran : le HTML est le livrable quand WeasyPrint n'est pas disponible. */
+@media screen {
+  html { font-size: 15px; line-height: 1.55; }
+  /* Le print positionne .meta, .dots et .cover-foot en absolu ; a l'ecran
+     cela les superpose au sous-titre. On repasse en flux. */
+  .cover-band { position: relative; }
+  .cover-band .sub { max-width: 60ch; margin-bottom: 20px; }
+  .cover-band .meta { position: static; margin-top: 18px; font-size: 13px; }
+  .cover-band .dots { position: absolute; right: 32px; top: 32px; width: 108px; }
+  .cover-foot { position: static; margin-top: 28px; padding-top: 14px; font-size: 12.5px; }
+  .cover-body { padding: 28px 0 0; gap: 28px; flex-wrap: wrap; }
+  .cover-gauge { flex: 0 0 210px; }
+  .cover-stats { flex: 1 1 380px; min-width: 0; }
+  body { max-width: 1040px; margin: 0 auto; padding: 32px 24px 96px; background: var(--paper); }
+  .section { page-break-before: auto; padding-top: 40px; border-top: 1px solid var(--line); margin-top: 40px; }
+  .section:first-of-type { border-top: 0; margin-top: 0; }
+  .cover { height: auto; }
+  .cover-band { height: auto; padding: 56px 40px 44px; border-radius: 14px; }
+  h2 { font-size: 26px; }
+  h3 { font-size: 17px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+  tbody tr:hover { background: var(--jev-soft); }
+  img, svg { max-width: 100%; height: auto; }
+  /* Les tableaux larges defilent au lieu de deborder. */
+  .scroll, table { display: block; overflow-x: auto; }
+  thead, tbody { display: table; width: 100%; }
+}
+
+@media screen and (max-width: 640px) {
+  body { padding: 20px 16px 64px; }
+  .cover-band { padding: 32px 20px 28px; }
+  h2 { font-size: 21px; }
+}

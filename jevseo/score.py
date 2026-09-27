@@ -16,35 +16,41 @@ JUDGED_SHARE = 0.7  # content and AI readiness: 70% Jev judgment, 30% rules
 
 # id: (category, severity, title, fix, source key, effort)
 JEV_RULES = {
-    "jev_value_prop": ("content", "high", "Homepage does not make the offer clear", "State what you offer, for whom, and why choose you in the first screen of the homepage.", "helpful", 2),
-    "jev_entity_clarity": ("ai", "medium", "Homepage does not state who, what and where plainly", "Say the organisation's name, what it does and its market or location in plain words near the top. Editorial heuristic: Google states no special optimization is required for its AI features.", "ai", 1),
-    "jev_local_schema": ("structured", "medium", "Local business without LocalBusiness structured data", "Add LocalBusiness JSON-LD with name, address, phone and opening hours that match the page.", "sd", 2),
-    "jev_helpfulness": ("content", "high", "Important pages that do not satisfy the visitor", "Expand these pages with the substance a visitor needs: answers, specifics, examples and next steps.", "helpful", 3),
-    "jev_specificity": ("content", "medium", "Generic content that any competitor could publish", "Add first-hand specifics: your own numbers, processes, examples, locations, names and results.", "helpful", 3),
-    "jev_trust": ("content", "medium", "Key pages show little evidence of expertise or trust", "Add named people, credentials, reviews, sources, results and contact details where they help the reader.", "helpful", 2),
-    "jev_next_step": ("content", "medium", "Commercial pages without a clear next step", "Give each commercial page one obvious, relevant call to action.", "starter", 1),
-    "jev_title_fit": ("onpage", "medium", "Titles that do not describe the page well", "Rewrite these titles to name what the page offers in the searcher's words.", "title", 1),
-    "jev_meta_fit": ("onpage", "low", "Weak meta descriptions", "Rewrite these descriptions as a specific summary of what the page delivers.", "snippet", 1),
-    "jev_h1_fit": ("onpage", "low", "Main headings that do not state the topic", "Make the H1 name the page's topic rather than a slogan.", "starter", 1),
-    "jev_answer_first": ("ai", "low", "Pages that bury the main point", "Open with a one or two sentence answer or offer before any preamble. Editorial heuristic for readers and answer engines, not a Google requirement.", "ai", 1),
-    "jev_citable": ("ai", "medium", "Few self-contained, quotable facts", "Add clear statements of fact, definitions and figures that make sense on their own. Editorial heuristic, not a Google requirement.", "ai", 2),
-    "jev_rewrite": ("content", "medium", "Pages Jev would rewrite or consolidate", "Review each page against the suggested action. This is Jev's editorial judgment, not a search engine rule.", "helpful", 3),
-    "jev_cannibalization": ("content", "medium", "Pages competing for the same searches", "Decide one page per search need: merge, differentiate, or canonicalise the weaker page.", "canonical", 2),
+    "jev_value_prop": ("content", "high", "L'accueil ne rend pas l'offre claire", "Dites ce que vous proposez, a qui, et pourquoi vous choisir des le premier ecran de la page d'accueil.", "helpful", 2),
+    "jev_entity_clarity": ("ai", "medium", "L'accueil ne dit pas clairement qui, quoi et ou", "Enoncez le nom de l'organisation, son activite et son marche ou sa zone en mots simples, pres du haut de page. Heuristique editoriale : Google indique qu'aucune optimisation particuliere n'est requise pour ses fonctionnalites IA.", "ai", 1),
+    "jev_local_schema": ("structured", "medium", "Entreprise locale sans donnees structurees LocalBusiness", "Ajoutez un JSON-LD LocalBusiness avec le nom, l'adresse, le telephone et les horaires, coherents avec la page.", "sd", 2),
+    "jev_helpfulness": ("content", "high", "Pages importantes qui ne satisfont pas le visiteur", "Etoffez ces pages avec ce dont le visiteur a besoin : reponses, details concrets, exemples et suite a donner.", "helpful", 3),
+    "jev_specificity": ("content", "medium", "Contenu generique que n'importe quel concurrent pourrait publier", "Ajoutez du concret de premiere main : vos chiffres, vos process, vos exemples, vos lieux, vos noms et vos resultats.", "helpful", 3),
+    "jev_trust": ("content", "medium", "Les pages cles montrent peu de preuves d'expertise ou de confiance", "Ajoutez des personnes nommees, des qualifications, des avis, des sources, des resultats et des coordonnees la ou cela aide le lecteur.", "helpful", 2),
+    "jev_next_step": ("content", "medium", "Pages commerciales sans suite evidente", "Donnez a chaque page commerciale un appel a l'action unique, evident et pertinent.", "starter", 1),
+    "jev_title_fit": ("onpage", "medium", "Titles qui decrivent mal la page", "Reecrivez ces titles en nommant ce que la page offre, dans les mots de l'internaute.", "title", 1),
+    "jev_meta_fit": ("onpage", "low", "Meta descriptions faibles", "Reecrivez ces descriptions en resume precis de ce que la page apporte.", "snippet", 1),
+    "jev_h1_fit": ("onpage", "low", "Titres principaux qui n'enoncent pas le sujet", "Faites du H1 le sujet de la page plutot qu'un slogan.", "starter", 1),
+    "jev_answer_first": ("ai", "low", "Pages qui enterrent l'essentiel", "Ouvrez par une reponse ou une offre en une ou deux phrases, avant tout preambule. Heuristique editoriale pour les lecteurs et les moteurs de reponse, pas une exigence de Google.", "ai", 1),
+    "jev_citable": ("ai", "medium", "Peu de faits autonomes et citables", "Ajoutez des enonces factuels clairs, des definitions et des chiffres qui se suffisent a eux-memes. Heuristique editoriale, pas une exigence de Google.", "ai", 2),
+    "jev_rewrite": ("content", "medium", "Pages que Jev reecrirait ou regrouperait", "Passez chaque page en revue au regard de l'action suggeree. C'est un jugement editorial de Jev, pas une regle de moteur.", "helpful", 3),
+    # FR: constats issus des deux questions locales ajoutees par le fork.
+    # La preuve locale est le vrai discriminant d'une page ville : sans elle,
+    # la page n'est qu'un nom de ville pose sur du texte generique, ce qui est
+    # exactement ce que Google qualifie de page satellite.
+    "jev_preuve_locale": ("content", "high", "Pages ville sans preuve d'activite sur place", "Ajoutez du concret local et verifiable : chantiers ou dossiers traites dans cette ville, quartiers desservis, delais d'intervention reels, avis de clients de la ville, equipe qui couvre le secteur. Le nom de la ville dans un texte generique ne suffit pas.", "doorway", 3),
+    "jev_coordonnees_locales": ("content", "medium", "Pages ville sans moyen de contact direct", "Faites figurer sur la page ville elle-meme un telephone, une adresse ou un formulaire. Un visiteur local en recherche active ne doit pas avoir a naviguer pour vous joindre.", "starter", 1),
+    "jev_cannibalization": ("content", "medium", "Pages qui se disputent les memes recherches", "Tranchez : une page par besoin de recherche. Fusionnez, differenciez, ou canonicalisez la plus faible.", "canonical", 2),
 }
 LOW = 0.45  # normalised Score below this becomes a finding
 # Jev findings whose advice is editorial rather than a documented search engine requirement
-HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step"}
+HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step", "jev_preuve_locale", "jev_coordonnees_locales"}
 REACHABLE_KD = 30  # DataForSEO keyword difficulty treated as winnable without major authority (heuristic)
 DFS_RULES = {
-    "dfs_striking": ("visibility", "medium", "Relevant keywords close to page one", "Strengthen the ranking page for each keyword: answer the search more fully, add internal links to it and tighten its title.", "dfs_labs", 2),
-    "dfs_existing_page": ("visibility", "medium", "Relevant keywords an existing page could win", "Expand the named page to cover each keyword's search need, then link to it from related pages.", "dfs_labs", 2),
-    "dfs_new_page": ("visibility", "medium", "Relevant keywords with no page to rank", "Plan one page per distinct search need; start with the highest volume, lowest difficulty keywords.", "dfs_labs", 3),
-    "dfs_backlink_gap": ("visibility", "medium", "Far fewer referring domains than sites ranking for the same keywords", "Earn links from sites your audience already reads: original data, tools, guest expertise and partner pages.", "dfs_backlinks", 4),
-    "dfs_broken_backlinks": ("visibility", "medium", "Backlinks pointing at broken pages", "Redirect each broken target to its closest live page so the links count again.", "dfs_backlinks", 1),
-    "dfs_aio_not_cited": ("ai", "low", "AI Overviews that do not cite the site", "Study who is cited today and make sure the page answers the search directly. Google states there are no extra requirements to appear in AI Overviews beyond normal Search eligibility.", "ai", 2),
+    "dfs_striking": ("visibility", "medium", "Mots cles pertinents aux portes de la premiere page", "Renforcez la page positionnee sur chaque mot cle : repondez plus completement a la recherche, ajoutez-lui des liens internes et resserrez son title.", "dfs_labs", 2),
+    "dfs_existing_page": ("visibility", "medium", "Mots cles pertinents qu'une page existante pourrait gagner", "Etoffez la page indiquee pour couvrir le besoin de chaque mot cle, puis liez-la depuis les pages connexes.", "dfs_labs", 2),
+    "dfs_new_page": ("visibility", "medium", "Mots cles pertinents sans page pour se positionner", "Prevoyez une page par besoin de recherche distinct ; commencez par les mots cles au volume le plus fort et a la difficulte la plus faible.", "dfs_labs", 3),
+    "dfs_backlink_gap": ("visibility", "medium", "Bien moins de domaines referents que les sites positionnes sur les memes mots cles", "Gagnez des liens depuis les sites que votre audience lit deja : donnees originales, outils, expertise invitee et pages partenaires.", "dfs_backlinks", 4),
+    "dfs_broken_backlinks": ("visibility", "medium", "Backlinks pointant vers des pages cassees", "Redirigez chaque cible cassee vers la page vivante la plus proche pour que ces liens comptent a nouveau.", "dfs_backlinks", 1),
+    "dfs_aio_not_cited": ("ai", "low", "Apercus IA qui ne citent pas le site", "Regardez qui est cite aujourd'hui et assurez-vous que la page repond directement a la recherche. Google indique qu'aucune exigence supplementaire n'existe pour apparaitre dans les Apercus IA au-dela de l'eligibilite normale a la recherche.", "ai", 2),
 }
-LABEL = {"helpfulness": "helpfulness", "specificity": "specificity", "trust": "trust", "clear_next_step": "P(clear next step)", "title_fit": "title fit",
-         "meta_fit": "meta description fit", "h1_fit": "P(H1 states the topic)", "answer_first": "P(opens with the point)", "citable": "citability"}
+LABEL = {"helpfulness": "utilite", "specificity": "specificite", "trust": "confiance", "clear_next_step": "P(suite evidente)", "title_fit": "adequation du title",
+         "meta_fit": "adequation de la meta description", "h1_fit": "P(le H1 enonce le sujet)", "answer_first": "P(ouvre sur l'essentiel)", "citable": "citabilite", "preuve_locale": "preuve locale", "coordonnees_visibles": "P(contact visible)"}
 SITE_LEVEL = {
     "dfs_striking", "dfs_existing_page", "dfs_new_page", "dfs_backlink_gap", "dfs_broken_backlinks", "dfs_aio_not_cited",
     "robots_missing", "robots_blocks_site", "sitemap_missing", "sitemap_errors", "soft_404", "host_variant", "no_https",
@@ -109,6 +115,10 @@ def jev_findings(crawl: dict, judged: dict) -> list[dict]:
         ("jev_meta_fit", "meta_fit", lambda a: a["value"] < LOW, None),
         ("jev_h1_fit", "h1_fit", lambda a: a["value"] < 0.5, None),
         ("jev_answer_first", "answer_first", lambda a: a["value"] < 0.5, None),
+        # FR: ne s'appliquent qu'aux pages qui portent ces questions, donc aux
+        # pages locales reperees par fr.page_locale().
+        ("jev_preuve_locale", "preuve_locale", lambda a: a["value"] < LOW, None),
+        ("jev_coordonnees_locales", "coordonnees_visibles", lambda a: a["value"] < 0.5, None),
         ("jev_citable", "citable", lambda a: a["value"] < LOW, None),
         ("jev_rewrite", "action", lambda a: a["value"] in ("rewrite", "merge_or_remove"), None),
     ]
@@ -268,36 +278,36 @@ def score(crawl: dict, findings: list[dict], judged: dict, perf: dict | None, df
     ai_j = judged_mean(["citable", "answer_first"])
     if content_j is not None:
         cats["content"] = JUDGED_SHARE * content_j * 100 + (1 - JUDGED_SHARE) * cats["content"]
-        notes["content"] = "70% Jev judgment (helpfulness, specificity, trust), 30% rules"
+        notes["content"] = "70 % de jugement Jev (utilite, specificite, confiance), 30 % de regles"
     else:
         cats["content"] = None
-        notes["content"] = "Not assessed: Jev judgments unavailable"
+        notes["content"] = "Non evalue : jugements Jev indisponibles"
     if ai_j is not None:
         site = judged.get("site") or {}
         ent = [site["entity_clarity"]["value"]] if site else []
         cats["ai"] = JUDGED_SHARE * mean([ai_j] + ent) * 100 + (1 - JUDGED_SHARE) * cats["ai"]
-        notes["ai"] = "70% Jev judgment (citability, answer-first, entity clarity), 30% rules"
+        notes["ai"] = "70 % de jugement Jev (citabilite, reponse en tete, clarte de l'entite), 30 % de regles"
     else:
-        notes["ai"] = "Rules only: Jev judgments unavailable"
+        notes["ai"] = "Regles seules : jugements Jev indisponibles"
     runs = [r for r in (perf or {}).get("runs", []) if "error" not in r and r["strategy"] == "mobile" and "performance" in r.get("scores", {})]
     if runs:
         lab = mean(r["scores"]["performance"] for r in runs)
         cats["performance"] = 0.5 * lab + 0.5 * cats["performance"]
-        notes["performance"] = "50% Lighthouse mobile performance, 50% crawl observations"
+        notes["performance"] = "50 % performance Lighthouse mobile, 50 % observations d'exploration"
     else:
-        notes["performance"] = "Crawl observations only: PageSpeed Insights unavailable"
+        notes["performance"] = "Observations d'exploration seules : PageSpeed Insights indisponible"
     if dfs and dfs.get("available") and dfs.get("overview") is not None:
-        notes["visibility"] = "DataForSEO rankings, keywords and backlinks, filtered by Jev relevance"
+        notes["visibility"] = "Positions, mots cles et backlinks DataForSEO, filtres par la pertinence Jev"
     else:
         cats["visibility"] = None
-        notes["visibility"] = "Not assessed: run with --full (DataForSEO)"
+        notes["visibility"] = "Non evalue : relancer avec --full (DataForSEO)"
     jev_hit = {f["category"] for f in findings if f.get("origin") == "jev"}
     dfs_hit = {f["category"] for f in findings if f.get("origin") == "dataforseo"}
     for cat in cats:
         if cat not in notes:
-            extra = [n for n, hit in (("Jev findings", jev_hit), ("DataForSEO findings", dfs_hit)) if cat in hit]
-            notes[cat] = "Rules" + (" plus " + " and ".join(extra) if extra else " only")
-    notes["ai"] += "; editorial heuristics, since Google states no special optimization is required for AI features"
+            extra = [n for n, hit in (("constats Jev", jev_hit), ("constats DataForSEO", dfs_hit)) if cat in hit]
+            notes[cat] = "Regles" + (" plus " + " et ".join(extra) if extra else " seules")
+    notes["ai"] += " ; heuristiques editoriales, Google indiquant qu'aucune optimisation particuliere n'est requise pour ses fonctionnalites IA"
 
     available = {c: v for c, v in cats.items() if v is not None}
     overall = sum(v * CATEGORY_WEIGHT[c] for c, v in available.items()) / sum(CATEGORY_WEIGHT[c] for c in available)
@@ -311,8 +321,8 @@ def score(crawl: dict, findings: list[dict], judged: dict, perf: dict | None, df
         caps.append("Capped at 60: the site is not reliably served over HTTPS")
     overall = round(overall)
     # A score built without Jev or PageSpeed leaves whole areas unassessed; say so wherever it appears.
-    partial = [reason for missing, reason in ((not any(jp.values()), "Jev judgments unavailable, so content quality was not assessed"),
-                                              (not runs, "PageSpeed Insights unavailable, so performance used crawl timings only")) if missing]
+    partial = [reason for missing, reason in ((not any(jp.values()), "jugements Jev indisponibles, la qualite du contenu n'a donc pas ete evaluee"),
+                                              (not runs, "PageSpeed Insights indisponible, la performance repose donc sur les seuls temps d'exploration")) if missing]
     return {
         "partial": partial,
         "overall": overall,

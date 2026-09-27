@@ -14,8 +14,9 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from jevseo.report import JEV_COLUMNS
 
-JEV_LABELS = {"helpfulness": "Helpfulness", "specificity": "Specificity", "trust": "Trust", "citable": "Citability", "answer_first": "Answer first",
-              "title_fit": "Title fit", "meta_fit": "Meta fit", "clear_next_step": "Next step"}
+JEV_LABELS = {"helpfulness": "Utilite", "specificity": "Specificite", "trust": "Confiance", "citable": "Citabilite", "answer_first": "Repond d'abord",
+              "title_fit": "Adequation title", "meta_fit": "Adequation meta", "clear_next_step": "Etape suivante",
+              "preuve_locale": "Preuve locale", "coordonnees_visibles": "Contact visible"}
 INK = "0B0B0B"
 JEV = "D45BB6"
 SOFT = "FBEAF5"
@@ -71,26 +72,26 @@ def write_xlsx(vm: dict, path: Path) -> Path:
 
     # ---------------- Summary
     ws = wb.active
-    ws.title = "Summary"
+    ws.title = "Synthese"
     ws.sheet_view.showGridLines = False
-    ws["A1"] = f"Jev SEO audit: {vm['domain']}"
+    ws["A1"] = f"Audit SEO : {vm['domain']}"
     ws["A1"].font = Font(name="Inter Display", bold=True, size=20)
     ws["A2"] = f"Audited {d['run']['finished_at']} · {vm['n_fetched']} URLs crawled · {vm['n_pages']} HTML pages · Jev {vm['ledger'].get('model_returned') or 'not used'}"
     ws["A2"].font = Font(name="Inter", size=10, color="52514E")
-    ws["A4"], ws["B4"] = "Overall score", s["overall"]
-    ws["A5"], ws["B5"] = "Grade", s["grade"] + (" (partial audit)" if s.get("partial") else "")
-    ws["A6"], ws["B6"] = "Jev cost (USD)", vm["ledger"].get("cost_usd") or 0
+    ws["A4"], ws["B4"] = "Score global", s["overall"]
+    ws["A5"], ws["B5"] = "Note", s["grade"] + (" (partial audit)" if s.get("partial") else "")
+    ws["A6"], ws["B6"] = "Cout Jev (USD)", vm["ledger"].get("cost_usd") or 0
     ws["B6"].number_format = "$0.0000"
-    ws["A7"], ws["B7"] = "DataForSEO cost (USD)", (vm["dfs"]["ledger"]["cost_usd"] if vm.get("dfs") else "not used")
+    ws["A7"], ws["B7"] = "Cout DataForSEO (USD)", (vm["dfs"]["ledger"]["cost_usd"] if vm.get("dfs") else "not used")
     if vm.get("dfs"):
         ws["B7"].number_format = "$0.0000"
     for r in (4, 5, 6, 7):
         ws[f"A{r}"].font = Font(name="Inter", bold=True)
         ws[f"B{r}"].font = Font(name="Inter Display", bold=True, size=14, color="A83A8C")
-    ws["A9"] = "Area"
+    ws["A9"] = "Domaine"
     ws["B9"] = "Score"
-    ws["C9"] = "Weight"
-    ws["D9"] = "How it is scored"
+    ws["C9"] = "Poids"
+    ws["D9"] = "Mode de calcul"
     for c in "ABCD":
         ws[f"{c}9"].font = HEAD
         ws[f"{c}9"].fill = PatternFill("solid", fgColor=INK)
@@ -104,7 +105,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
     cf(ws, f"B10:B{r - 1}", ColorScaleRule(start_type="num", start_value=0, start_color="FBEAF5", end_type="num", end_value=100, end_color="A83A8C"))
     chart = BarChart()
     chart.type = "bar"
-    chart.title = "Score by area"
+    chart.title = "Score par domaine"
     chart.style = 10
     chart.y_axis.scaling.min = 0
     chart.y_axis.scaling.max = 100
@@ -116,7 +117,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
     ws.add_chart(chart, "F3")
 
     r += 1
-    ws.cell(r, 1, "Live status counts (from the Actions sheet)").font = Font(name="Inter", bold=True, size=12)
+    ws.cell(r, 1, "Compteurs de statut en direct (onglet Actions)").font = Font(name="Inter", bold=True, size=12)
     r += 1
     status_start = r
     for st in STATUSES:
@@ -124,17 +125,17 @@ def write_xlsx(vm: dict, path: Path) -> Path:
         ws.cell(r, 2, f'=COUNTIF(Actions!$E:$E,"{st}")').font = BODY
         r += 1
     r += 1
-    ws.cell(r, 1, "Open actions by priority").font = Font(name="Inter", bold=True, size=12)
+    ws.cell(r, 1, "Actions ouvertes par priorite").font = Font(name="Inter", bold=True, size=12)
     r += 1
 
     for p in ("P1", "P2", "P3"):
         ws.cell(r, 1, p).font = BODY
         ws.cell(r, 2, f'=COUNTIFS(Actions!$C:$C,"{p}",Actions!$E:$E,"<>done",Actions!$E:$E,"<>not_applicable")').font = BODY
         r += 1
-    ws.cell(r, 1, "Total actions").font = Font(name="Inter", bold=True)
+    ws.cell(r, 1, "Total des actions").font = Font(name="Inter", bold=True)
     ws.cell(r, 2, f"=COUNTA(Actions!$A:$A)-1").font = Font(name="Inter", bold=True)
     donut = DoughnutChart()
-    donut.title = "Action status"
+    donut.title = "Statut des actions"
     donut.add_data(Reference(ws, min_col=2, min_row=status_start, max_row=status_start + len(STATUSES) - 1))
     donut.set_categories(Reference(ws, min_col=1, min_row=status_start, max_row=status_start + len(STATUSES) - 1))
     donut.height, donut.width = 7, 9
@@ -150,7 +151,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
 
     # ---------------- Actions (editable authority)
     wa = wb.create_sheet("Actions")
-    headers = ["ID", "Action", "Priority", "Severity", "Status", "Owner", "Due", "Notes", "Impact", "Effort", "Quick win", "Area", "Judged by", "Pages", "Evidence", "Fix", "Needs human check", "Heuristic", "Source", "Affected URLs"]
+    headers = ["ID", "Action", "Priorite", "Gravite", "Statut", "Responsable", "Echeance", "Notes", "Impact", "Effort", "Gain rapide", "Domaine", "Juge par", "Pages", "Preuve", "Correctif", "A verifier par un humain", "Heuristique", "Source", "URL concernees"]
     rows = []
     for a in vm["actions"]:
         rows.append([
@@ -179,7 +180,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
 
     # ---------------- Pages
     wp = wb.create_sheet("Pages")
-    cols = [("URL", "url", 50), ("Status", "status", 8), ("Depth", "depth", 7), ("Title", "title", 40), ("Title chars", "title_len", 8), ("Meta chars", "meta_len", 8), ("H1", "h1", 34), ("H1 count", "h1_count", 7), ("Words", "words", 8), ("Inlinks", "inlinks", 8), ("Outlinks", "outlinks", 8), ("Images", "images", 8), ("No alt", "missing_alt", 7), ("Indexable", "indexable", 9), ("In sitemap", "in_sitemap", 9), ("Canonical", "canonical", 40), ("Schema", "schema", 26), ("TTFB ms", "ttfb", 8), ("HTML KB", "kb", 8), ("Rendered", "rendered", 9), ("Type (Jev)", "page_type", 18), ("Intent (Jev)", "intent", 14), ("Importance (Jev)", "importance", 10), ("Action (Jev)", "action", 14)] + [(f"{JEV_LABELS.get(key, label.title())} (Jev)", key, 12) for key, label in JEV_COLUMNS]
+    cols = [("URL", "url", 50), ("Statut", "status", 8), ("Profondeur", "depth", 7), ("Title", "title", 40), ("Caracteres title", "title_len", 8), ("Caracteres meta", "meta_len", 8), ("H1", "h1", 34), ("Nb H1", "h1_count", 7), ("Mots", "words", 8), ("Liens entrants", "inlinks", 8), ("Liens sortants", "outlinks", 8), ("Images", "images", 8), ("Sans alt", "missing_alt", 7), ("Indexable", "indexable", 9), ("Dans le sitemap", "in_sitemap", 9), ("Canonique", "canonical", 40), ("Schema", "schema", 26), ("TTFB ms", "ttfb", 8), ("HTML Ko", "kb", 8), ("Rendu JS", "rendered", 9), ("Type (Jev)", "page_type", 18), ("Intention (Jev)", "intent", 14), ("Importance (Jev)", "importance", 10), ("Action (Jev)", "action", 14)] + [(f"{JEV_LABELS.get(key, label.title())} (Jev)", key, 12) for key, label in JEV_COLUMNS]
     prow = []
     for p in vm["pages"]:
         row = []
@@ -205,7 +206,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
         cf(wp, f"{first_jev}2:{last}{len(prow) + 1}", ColorScaleRule(start_type="num", start_value=0, start_color="FBEAF5", end_type="num", end_value=1, end_color="A83A8C"))
 
     # ---------------- Jev judgments (raw, with probabilities)
-    wj = wb.create_sheet("Jev judgments")
+    wj = wb.create_sheet("Jugements Jev")
     jrows = []
     for url, ans in (d["jev"].get("pages") or {}).items():
         for key, a in (ans or {}).items():
@@ -220,30 +221,30 @@ def write_xlsx(vm: dict, path: Path) -> Path:
     for p in d["jev"].get("pairs", []):
         if p.get("judgment"):
             jrows.append([f"{p['a']} vs {p['b']}", "compete", "noul", round(p["judgment"]["value"], 3), None, None, p["judgment"]["band"], f"title overlap {p['title_overlap']}"])
-    table(wj, ["Page", "Question", "Primitive", "Answer (0 to 1 or option)", "Confidence", "Side probability (Score)", "Band", "Top probabilities"], jrows, [50, 18, 9, 18, 11, 12, 10, 50])
+    table(wj, ["Page", "Question", "Primitive", "Reponse (0 a 1 ou option)", "Confiance", "Probabilite du cote (Score)", "Bande", "Probabilites principales"], jrows, [50, 18, 9, 18, 11, 12, 10, 50])
     for i in range(2, len(jrows) + 2):
         wj[f"E{i}"].number_format = "0.00"
         wj[f"F{i}"].number_format = "0.00"
     cf(wj, f"G2:G{len(jrows) + 1}", CellIsRule(operator="equal", formula=['"review"'], fill=PatternFill("solid", fgColor="FDF0D0")))
 
     # ---------------- Technical
-    wt = wb.create_sheet("Technical")
+    wt = wb.create_sheet("Technique")
     site = d["site"]
     facts = [
-        ["Final homepage URL", site["final_url"]],
+        ["URL finale de l'accueil", site["final_url"]],
         ["HTTPS", "yes" if site["https"] else "no"],
-        ["HTTP redirects to HTTPS", "yes" if site["probes"]["http_to_https"] else "no"],
-        ["Alternate host", f"{site['probes']['host_variant']['host']} -> status {site['probes']['host_variant']['status']}, redirects to preferred: {site['probes']['host_variant']['redirects_to_canonical_host']}"],
-        ["Nonexistent URL status", site["probes"]["not_found_status"]],
+        ["HTTP redirige vers HTTPS", "yes" if site["probes"]["http_to_https"] else "no"],
+        ["Hote alternatif", f"{site['probes']['host_variant']['host']} -> status {site['probes']['host_variant']['status']}, redirects to preferred: {site['probes']['host_variant']['redirects_to_canonical_host']}"],
+        ["Statut d'une URL inexistante", site["probes"]["not_found_status"]],
         ["robots.txt", "present" if site["robots"]["present"] else "missing"],
-        ["Sitemaps declared", ", ".join(site["robots"]["sitemaps"]) or "none"],
-        ["Sitemap URLs", site["sitemaps"]["total_urls"]],
+        ["Sitemaps declares", ", ".join(site["robots"]["sitemaps"]) or "none"],
+        ["URL du sitemap", site["sitemaps"]["total_urls"]],
         ["llms.txt", "present" if site["probes"]["llms_txt"] else "not found"],
-        ["Render mode", site["render"]["mode"]],
-        ["Requests made", site["requests"]],
-        ["Page cap reached", "yes" if site["limits"]["hit_page_cap"] else "no"],
-    ] + [[f"Search bot: {b}", "allowed" if ok else "blocked"] for b, ok in site["robots"]["search_bots"].items()] + [[f"AI bot: {b}", "allowed" if ok else "blocked"] for b, ok in site["robots"]["ai_bots"].items()]
-    table(wt, ["Check", "Value"], facts, [34, 90])
+        ["Mode de rendu", site["render"]["mode"]],
+        ["Requetes effectuees", site["requests"]],
+        ["Plafond de pages atteint", "yes" if site["limits"]["hit_page_cap"] else "no"],
+    ] + [[f"Robot de recherche : {b}", "allowed" if ok else "blocked"] for b, ok in site["robots"]["search_bots"].items()] + [[f"Robot IA : {b}", "allowed" if ok else "blocked"] for b, ok in site["robots"]["ai_bots"].items()]
+    table(wt, ["Controle", "Valeur"], facts, [34, 90])
 
     # ---------------- Performance
     wf = wb.create_sheet("Performance")
@@ -253,7 +254,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
         m = f.get("metrics", {})
         prow.append([r["url"], r["strategy"], *(r["scores"].get(c) for c in ("performance", "accessibility", "best-practices", "seo")),
                      *(m.get(k, {}).get("p75") for k in ("LCP", "INP", "CLS")), *(m.get(k, {}).get("rating") for k in ("LCP", "INP", "CLS")), "page" if r.get("field_url") else "origin" if r.get("field_origin") else "none"])
-    table(wf, ["URL", "Device", "Performance", "Accessibility", "Best practices", "SEO", "LCP p75 ms", "INP p75 ms", "CLS p75", "LCP rating", "INP rating", "CLS rating", "Field data level"], prow, [44, 9, 12, 12, 12, 8, 11, 11, 9, 16, 16, 16, 12])
+    table(wf, ["URL", "Appareil", "Performance", "Accessibilite", "Bonnes pratiques", "SEO", "LCP p75 ms", "INP p75 ms", "CLS p75", "LCP rating", "INP rating", "CLS rating", "Field data level"], prow, [44, 9, 12, 12, 12, 8, 11, 11, 9, 16, 16, 16, 12])
     if prow:
         bc = BarChart()
         bc.title = "Lighthouse scores"
@@ -332,7 +333,7 @@ def write_xlsx(vm: dict, path: Path) -> Path:
     table(wm, ["Topic", "Detail"], notes, [20, 120])
 
     for sheet in wb.worksheets:
-        sheet.sheet_properties.tabColor = JEV if sheet.title in ("Summary", "Actions", "Jev judgments") else "C3C2B7"
+        sheet.sheet_properties.tabColor = JEV if sheet.title in ("Synthese", "Actions", "Jugements Jev") else "C3C2B7"
     # Formula cells carry no stored values; ask the spreadsheet app to calculate on open.
     wb.calculation.fullCalcOnLoad = True
     wb.save(path)

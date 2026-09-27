@@ -9,55 +9,55 @@
     <span class="chip pri pri-{{ a.priority }}">{{ a.priority }}</span>
     {{ chip_sev(a.severity) }}
     <span class="chip {{ a.by_class }}">{{ a.by }}</span>
-    {% if a.needs_review %}<span class="chip tag-review">{{ a.needs_review }} to verify</span>{% endif %}
-    {% if a.quick_win %}<span class="chip qw">quick win</span>{% endif %}
-    {% if a.heuristic %}<span class="chip sev-info">heuristic</span>{% endif %}
+    {% if a.needs_review %}<span class="chip tag-review">{{ a.needs_review }} a verifier</span>{% endif %}
+    {% if a.quick_win %}<span class="chip qw">gain rapide</span>{% endif %}
+    {% if a.heuristic %}<span class="chip sev-info">heuristique</span>{% endif %}
   </div>
-  <div class="ev">{{ a.count }} affected · {{ a.evidence }}</div>
-  <div class="fix"><b>Fix:</b> {{ a.fix }} <a href="{{ a.source }}">Source</a></div>
-  <div class="urls url">{{ a.short_urls | join('  ·  ') }}{% if a.count > 6 %}  ·  +{{ a.count - 6 }} more{% endif %}</div>
+  <div class="ev">{{ a.count }} concernees · {{ a.evidence }}</div>
+  <div class="fix"><b>Correctif :</b> {{ a.fix }} <a href="{{ a.source }}">Source</a></div>
+  <div class="urls url">{{ a.short_urls | join('  ·  ') }}{% if a.count > 6 %}  ·  +{{ a.count - 6 }} autres{% endif %}</div>
 </div>
 {%- endmacro -%}
 <!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>SEO audit: {{ domain }}</title><style>{{ css | safe }}</style></head>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Audit SEO · {{ domain }}</title><style>{{ css | safe }}</style></head>
 <body>
 
 <!-- COVER -->
 <section class="cover">
   <div class="cover-band">
-    <div class="kicker">Jev SEO audit</div>
+    <div class="kicker">Audit SEO</div>
     <h1 class="domain-string">{{ domain }}</h1>
-    <div class="sub">A live crawl of the site, checked by rules, judged by Jev, scored by code and explained in plain language.</div>
+    <div class="sub">Une exploration en direct du site, verifiee par des regles, jugee par Jev, notee par le code et expliquee en clair.</div>
     <svg class="dots" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      {% for i in range(6) %}{% for j in range(6) %}<circle cx="{{ 10 + i * 20 }}" cy="{{ 10 + j * 20 }}" r="{{ 2 + ((i * 7 + j * 3) % 5) }}" fill="{{ '#d45bb6' if (i + j) % 3 == 0 else '#52514e' }}"/>{% endfor %}{% endfor %}
+      {% for i in range(6) %}{% for j in range(6) %}<circle cx="{{ 10 + i * 20 }}" cy="{{ 10 + j * 20 }}" r="{{ 2 + ((i * 7 + j * 3) % 5) }}" fill="{{ '#075CD8' if (i + j) % 3 == 0 else '#3D4657' }}"/>{% endfor %}{% endfor %}
     </svg>
-    <div class="meta"><b>{{ date }}</b> · {{ n_fetched }} URLs crawled · {{ n_judgments }} Jev judgments · Jev cost ${{ '%.4f' % (ledger.cost_usd or 0) }}{% if dfs %} · DataForSEO ${{ '%.4f' % dfs.ledger.cost_usd }}{% endif %}</div>
+    <div class="meta"><b>{{ date }}</b> · {{ n_fetched }} URL explorees · {{ n_judgments }} jugements Jev · cout Jev ${{ '%.4f' % (ledger.cost_usd or 0) }}{% if dfs %} · DataForSEO ${{ '%.4f' % dfs.ledger.cost_usd }}{% endif %}</div>
   </div>
   <div class="cover-body">
     <div class="cover-gauge">{{ charts.svg.gauge | safe }}</div>
     <div class="cover-stats">
       <div class="tiles">
-        <div class="tile"><div class="v">{{ n_pages }}</div><div class="l">HTML pages analysed</div></div>
-        <div class="tile"><div class="v">{{ actions | length }}</div><div class="l">actions found</div></div>
-        <div class="tile jev"><div class="v">{{ sev_counts.get('critical', 0) + sev_counts.get('high', 0) }}</div><div class="l">critical or high</div></div>
+        <div class="tile"><div class="v">{{ n_pages }}</div><div class="l">pages HTML analysees</div></div>
+        <div class="tile"><div class="v">{{ actions | length }}</div><div class="l">actions identifiees</div></div>
+        <div class="tile jev"><div class="v">{{ sev_counts.get('critical', 0) + sev_counts.get('high', 0) }}</div><div class="l">critiques ou elevees</div></div>
       </div>
       {{ chart('categories') }}
     </div>
   </div>
-  <div class="cover-foot">{% if scores.partial %}<b>Partial audit:</b> {{ scores.partial | join('; ') }}. {% endif %}Scores are an internal rubric for prioritising work, not a prediction of rankings or traffic. Method, formulas and sources are in the appendix.</div>
+  <div class="cover-foot">{% if scores.partial %}<b>Audit partiel :</b> {{ scores.partial | join('; ') }}. {% endif %}Les scores sont une grille interne de priorisation, pas une prediction de positions ni de trafic. La methode, les formules et les sources figurent en annexe.</div>
 </section>
 
 <!-- EXECUTIVE SUMMARY -->
 <section class="section">
-  <div class="kicker">Executive summary</div>
-  <h2>What matters most on {{ domain }}</h2>
+  <div class="kicker">Synthese</div>
+  <h2>Ce qui compte le plus sur {{ domain }}</h2>
   {% for para in narrative.executive_summary %}<p class="lede">{{ para }}</p>{% endfor %}
   <div class="tiles">
-    <div class="tile"><div class="v">{{ scores.overall }}<span class="small muted">/100</span></div><div class="l">overall score, grade {{ scores.grade }}</div></div>
-    <div class="tile"><div class="v">{{ p1_count }}</div><div class="l">fix-first actions</div></div>
-    <div class="tile"><div class="v">{{ quick_wins | length }}</div><div class="l">quick wins</div></div>
-    <div class="tile jev"><div class="v">{{ decisive_share }}%</div><div class="l">Jev answers decisive</div></div>
+    <div class="tile"><div class="v">{{ scores.overall }}<span class="small muted">/100</span></div><div class="l">score global, note {{ scores.grade }}</div></div>
+    <div class="tile"><div class="v">{{ p1_count }}</div><div class="l">actions a traiter en premier</div></div>
+    <div class="tile"><div class="v">{{ quick_wins | length }}</div><div class="l">gains rapides</div></div>
+    <div class="tile jev"><div class="v">{{ decisive_share }}%</div><div class="l">reponses Jev decisives</div></div>
   </div>
   <div class="acards">
     {% for a in actions[:3] %}
@@ -72,13 +72,13 @@
 </section>
 
 <section class="section">
-  <div class="kicker">Executive summary · the plan</div>
-  <h2>What works, what holds it back, what to do</h2>
+  <div class="kicker">Synthese · le plan</div>
+  <h2>Ce qui marche, ce qui freine, quoi faire</h2>
   <div class="cols">
-    <div class="card"><h4>What is working</h4><ul>{% for s in narrative.strengths %}<li>{{ s }}</li>{% endfor %}</ul></div>
-    <div class="card"><h4>What is holding the site back</h4><ul>{% for s in narrative.risks %}<li>{{ s }}</li>{% endfor %}</ul></div>
+    <div class="card"><h4>Ce qui fonctionne</h4><ul>{% for s in narrative.strengths %}<li>{{ s }}</li>{% endfor %}</ul></div>
+    <div class="card"><h4>Ce qui freine le site</h4><ul>{% for s in narrative.risks %}<li>{{ s }}</li>{% endfor %}</ul></div>
   </div>
-  <h3>Plan</h3>
+  <h3>Plan d'action</h3>
   <div class="plan">
     {% for block in narrative.plan %}<div><h4>{{ block.horizon }}</h4><ul>{% for i in block['items'] %}<li>{{ i }}</li>{% endfor %}</ul></div>{% endfor %}
   </div>
@@ -88,44 +88,44 @@
 
 <!-- HOW IT WORKS -->
 <section class="section">
-  <div class="kicker">How this audit was made</div>
-  <h2>A source finds, code decides, Jev judges, Claude writes</h2>
-  <p class="lede">Each stage does only what it is good at. Anything a count, a status code or a string match can decide is decided by code. Jev, TypeSafe's System One model, answers narrow typed questions about meaning, with probabilities. Nothing is invented to fill a gap: missing data is shown as missing.</p>
+  <div class="kicker">Comment cet audit a ete fait</div>
+  <h2>Les sources trouvent, le code tranche, Jev juge, Claude redige</h2>
+  <p class="lede">Chaque etape ne fait que ce qu'elle sait faire. Tout ce qu'un comptage, un code HTTP ou une correspondance de chaine peut trancher est tranche par le code. Jev, le modele System One de TypeSafe, repond a des questions fermees et typees sur le sens, avec des probabilites. Rien n'est invente pour combler un trou : une donnee absente est affichee comme absente.</p>
   <div class="pipeline">
-    <div class="step"><div class="n">1</div><h4>Crawl</h4><div class="what">Live fetch from the homepage: robots.txt, sitemaps, internal links, JavaScript rendering when needed.</div><div class="stat">{{ n_fetched }}<span>URLs · {{ site.requests }} requests</span></div></div>
+    <div class="step"><div class="n">1</div><h4>Exploration</h4><div class="what">Recuperation en direct depuis l'accueil : robots.txt, sitemaps, liens internes, rendu JavaScript si necessaire.</div><div class="stat">{{ n_fetched }}<span>URL · {{ site.requests }} requests</span></div></div>
     <div class="arrow">›</div>
-    <div class="step"><div class="n">2</div><h4>Rules</h4><div class="what">{{ rule_count }} deterministic checks tied to Google Search Central and web standards.</div><div class="stat">{{ rule_findings }}<span>rule findings</span></div></div>
+    <div class="step"><div class="n">2</div><h4>Regles</h4><div class="what">{{ rule_count }} controles deterministes adosses a Google Search Central et aux standards du web.</div><div class="stat">{{ rule_findings }}<span>constats de regles</span></div></div>
     <div class="arrow">›</div>
-    <div class="step jev"><div class="n">3</div><h4>Jev judges</h4><div class="what">Typed Choice, Score and Noul questions, batched per page, with probabilities kept.</div><div class="stat">{{ n_judgments }}<span>judgments · {{ ledger.requests or 0 }} requests · ${{ '%.4f' % (ledger.cost_usd or 0) }}</span></div></div>
+    <div class="step jev"><div class="n">3</div><h4>Jev juge</h4><div class="what">Questions typees Choice, Score et Noul, groupees par page, probabilites conservees.</div><div class="stat">{{ n_judgments }}<span>jugements · {{ ledger.requests or 0 }} requests · ${{ '%.4f' % (ledger.cost_usd or 0) }}</span></div></div>
     <div class="arrow">›</div>
-    <div class="step"><div class="n">4</div><h4>Measure</h4><div class="what">PageSpeed Insights: real-user Core Web Vitals and Lighthouse lab scores.</div><div class="stat">{{ perf_runs | length }}<span>PageSpeed runs</span></div></div>
+    <div class="step"><div class="n">4</div><h4>Mesure</h4><div class="what">PageSpeed Insights : Core Web Vitals issus d'utilisateurs reels et scores Lighthouse en laboratoire.</div><div class="stat">{{ perf_runs | length }}<span>mesures PageSpeed</span></div></div>
     <div class="arrow">›</div>
-    <div class="step"><div class="n">5</div><h4>Score and write</h4><div class="what">Code scores and ranks every action; the narrative is written from the evidence.</div><div class="stat">{{ actions | length }}<span>ranked actions</span></div></div>
+    <div class="step"><div class="n">5</div><h4>Notation et redaction</h4><div class="what">Le code note et classe chaque action ; la narration est ecrite a partir des preuves.</div><div class="stat">{{ actions | length }}<span>actions classees</span></div></div>
   </div>
-  <h3>Who decides what</h3>
+  <h3>Qui decide quoi</h3>
   <table>
-    <tr><th>Stage</th><th>Owns</th><th>Never does</th></tr>
-    <tr><td><b>Code</b></td><td>Crawling, status codes, counts, duplicates, schema parsing, formulas, ranking</td><td>Guess at meaning</td></tr>
-    <tr><td><b>Jev</b></td><td>Page type, search intent, importance, helpfulness, specificity, trust, citability, title and meta fit, competing page pairs</td><td>Predict rankings or traffic, invent data, grant permission to act</td></tr>
-    <tr><td><b>PageSpeed</b></td><td>Chrome UX Report field data and Lighthouse lab scores</td><td>Stand in for every page or device</td></tr>
-    <tr><td><b>Claude</b></td><td>The summary and plan, citing action IDs</td><td>Add findings that the evidence does not show</td></tr>
+    <tr><th>Etape</th><th>Ce dont il repond</th><th>Ne fait jamais</th></tr>
+    <tr><td><b>Code</b></td><td>Exploration, codes HTTP, comptages, doublons, lecture du schema, formules, classement</td><td>Deviner le sens</td></tr>
+    <tr><td><b>Jev</b></td><td>Type de page, intention de recherche, importance, utilite, specificite, confiance, citabilite, adequation du title et de la meta, preuve locale, paires de pages concurrentes</td><td>Predire des positions ou du trafic, inventer des donnees, autoriser une action</td></tr>
+    <tr><td><b>PageSpeed</b></td><td>Donnees terrain Chrome UX Report et scores Lighthouse</td><td>Se substituer a toutes les pages ou a tous les appareils</td></tr>
+    <tr><td><b>Claude</b></td><td>La synthese et le plan, en citant les identifiants d'action</td><td>Ajouter un constat que les preuves ne montrent pas</td></tr>
   </table>
-  <h3>What went through each stage</h3>
+  <h3>Ce qui est passe par chaque etape</h3>
   {{ chart('funnel') }}
 </section>
 
 <!-- SCORECARD -->
 <section class="section">
-  <div class="kicker">Scorecard</div>
-  <h2>{{ scores.category_names | length }} areas, one score</h2>
+  <div class="kicker">Tableau de notes</div>
+  <h2>{{ scores.category_names | length }} domaines, un score</h2>
   <div class="cols">
     <div style="flex: 0 0 55mm">{{ charts.svg.gauge | safe }}</div>
     <div>{{ chart('categories') }}</div>
   </div>
-  {% if scores.caps %}<div class="note"><b>Score cap:</b> {{ scores.caps | join('; ') }}</div>{% endif %}
-  {% if scores.partial %}<div class="note"><b>Partial audit:</b> {{ scores.partial | join('; ') }}. The overall score covers only the areas that were assessed.</div>{% endif %}
+  {% if scores.caps %}<div class="note"><b>Plafond de score :</b> {{ scores.caps | join('; ') }}</div>{% endif %}
+  {% if scores.partial %}<div class="note"><b>Audit partiel :</b> {{ scores.partial | join('; ') }}. Le score global ne couvre que les domaines evalues.</div>{% endif %}
   <table>
-    <tr><th>Area</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Actions</th><th>How it is scored</th></tr>
+    <tr><th>Area</th><th class="num">Score</th><th class="num">Poids</th><th class="num">Actions</th><th>Mode de calcul</th></tr>
     {% for c, name in scores.category_names.items() %}
     <tr><td><b>{{ name }}</b></td><td class="num">{{ scores.categories[c] if scores.categories[c] is not none else 'n/a' }}</td><td class="num">{{ scores.weights[c] }}</td><td class="num">{{ findings_by_cat[c] | length }}</td><td>{{ scores.notes[c] }}</td></tr>
     {% endfor %}
@@ -138,14 +138,14 @@
 
 <!-- PRIORITIES -->
 <section class="section">
-  <div class="kicker">Priorities</div>
-  <h2>What to fix first</h2>
-  <p class="lede">Impact combines severity, how many pages are affected and how important Jev judged those pages to be. Effort is a planning estimate, not a quote.</p>
+  <div class="kicker">Priorites</div>
+  <h2>Par quoi commencer</h2>
+  <p class="lede">L'impact combine la gravite, le nombre de pages concernees et l'importance que Jev accorde a ces pages. L'effort est une estimation de planification, pas un devis.</p>
   {{ chart('impact_effort', 'Each dot is one action; labelled dots are fix-first or high impact. Colour shows priority.') }}
   <table>
-    <tr><th>ID</th><th>Action</th><th>Priority</th><th class="num">Impact</th><th>Effort</th><th class="num">Pages</th><th>By</th></tr>
+    <tr><th>ID</th><th>Action</th><th>Priorite</th><th class="num">Impact</th><th>Effort</th><th class="num">Pages</th><th>By</th></tr>
     {% for a in top_actions %}
-    <tr><td><b>{{ a.action_id }}</b></td><td>{{ a.title }}{% if a.quick_win %} <span class="chip qw">quick win</span>{% endif %}</td><td><span class="chip pri pri-{{ a.priority }}">{{ a.priority }}</span> {{ a.priority_text }}</td><td class="num">{{ a.impact }}</td><td>{{ a.effort_text }}</td><td class="num">{{ a.count }}</td><td><span class="chip {{ a.by_class }}">{{ a.by }}</span></td></tr>
+    <tr><td><b>{{ a.action_id }}</b></td><td>{{ a.title }}{% if a.quick_win %} <span class="chip qw">gain rapide</span>{% endif %}</td><td><span class="chip pri pri-{{ a.priority }}">{{ a.priority }}</span> {{ a.priority_text }}</td><td class="num">{{ a.impact }}</td><td>{{ a.effort_text }}</td><td class="num">{{ a.count }}</td><td><span class="chip {{ a.by_class }}">{{ a.by }}</span></td></tr>
     {% endfor %}
   </table>
 </section>
@@ -153,9 +153,9 @@
 <!-- SITE STRUCTURE -->
 {% if 'site_map' in charts.svg %}
 <section class="section">
-  <div class="kicker">Site structure</div>
-  <h2>How the site is linked</h2>
-  <p class="lede">Pages laid out by clicks from the homepage. Bigger dots are pages Jev judged more important; the outer dashed ring holds pages that no crawled page links to.</p>
+  <div class="kicker">Structure du site</div>
+  <h2>Comment le site est maille</h2>
+  <p class="lede">Pages disposees selon leur distance en clics depuis l'accueil. Plus le point est gros, plus Jev juge la page importante ; l'anneau pointille exterieur regroupe les pages qu'aucune page exploree ne lie.</p>
   {{ chart('site_map') }}
 </section>
 {% endif %}
@@ -163,8 +163,8 @@
 <!-- SEARCH VISIBILITY (full mode) -->
 {% if dfs %}
 <section class="section">
-  <div class="kicker">Search visibility · DataForSEO</div>
-  <h2>Where the site ranks today</h2>
+  <div class="kicker">Visibilite sur les moteurs · DataForSEO</div>
+  <h2>Ou le site se positionne aujourd'hui</h2>
   <p class="lede">Google rankings, estimated traffic and links for {{ domain }} (location {{ dfs.location_code }}, language {{ dfs.language_code }}). Traffic is DataForSEO's estimate from rankings and search volumes, not measured visits.</p>
   <div class="tiles">
     <div class="tile"><div class="v">{{ dfs.overview.count if dfs.overview.count is not none else 'n/a' }}</div><div class="l">keywords ranking in Google</div></div>
@@ -177,29 +177,29 @@
     <div>{{ chart('positions', 'Ranking keywords by Google position') }}</div>
     <div>{{ chart('referring_domains', 'Referring domains: the site (magenta) and domains ranking for the same keywords') }}</div>
   </div>
-  <h3>Top ranking keywords</h3>
+  <h3>Principaux mots cles positionnes</h3>
   <table>
-    <tr><th>Keyword</th><th class="num">Position</th><th class="num">Searches/mo</th><th>Ranking page</th><th class="num">Jev relevance</th></tr>
+    <tr><th>Mot cle</th><th class="num">Position</th><th class="num">Recherches/mois</th><th>Page positionnee</th><th class="num">Pertinence Jev</th></tr>
     {% for k in dfs.ranked[:12] %}<tr><td>{{ k.keyword }}</td><td class="num">{{ k.position }}</td><td class="num">{{ '{:,}'.format(k.volume) if k.volume is not none else 'n/a' }}</td><td class="url">{{ k.page }}</td><td class="num">{{ '%.2f' % k.relevance if k.relevance is not none else '–' }}</td></tr>{% endfor %}
   </table>
   {% if dfs.ranked_total and dfs.ranked_total > 12 %}<p class="caption">Showing 12 of {{ dfs.ranked_total }} ranking keywords; all are in the workbook.</p>{% endif %}
 </section>
 <section class="section">
-  <div class="kicker">Search visibility · DataForSEO + Jev</div>
-  <h2>Keywords worth winning</h2>
-  <p class="lede">DataForSEO supplied keyword ideas, suggestions and competitor gaps. Jev kept only those relevant to this business (0.66 or more), dropped searches for other brands, and chose which existing page should own each one, or said a new page is needed.</p>
+  <div class="kicker">Visibilite sur les moteurs · DataForSEO + Jev</div>
+  <h2>Mots cles a aller chercher</h2>
+  <p class="lede">DataForSEO a fourni des idees de mots cles, des suggestions et les trous face aux concurrents. Jev n'a garde que ceux pertinents pour cette entreprise (0,66 ou plus), ecarte les recherches de marque tierce, et choisi quelle page existante devrait porter chaque one, or said a new page is needed.</p>
   {{ chart('opportunities') }}
   {% if dfs.opportunities %}
   <table>
-    <tr><th>Keyword</th><th class="num">Searches/mo</th><th class="num">Difficulty</th><th>Intent</th><th class="num">Jev relevance</th><th>Page to own it</th></tr>
+    <tr><th>Mot cle</th><th class="num">Recherches/mois</th><th class="num">Difficulte</th><th>Intention</th><th class="num">Pertinence Jev</th><th>Page qui doit le porter</th></tr>
     {% for k in dfs.opportunities[:6] %}<tr><td>{{ k.keyword }}</td><td class="num">{{ '{:,}'.format(k.volume) }}</td><td class="num">{{ k.difficulty if k.difficulty is not none else 'n/a' }}</td><td>{{ k.intent or '–' }}</td><td class="num">{{ '%.2f' % k.relevance if k.relevance is not none else '–' }}</td><td class="url">{{ k.target }}</td></tr>{% endfor %}
   </table>
-  {% else %}<p class="muted">No relevant keyword opportunities passed Jev's relevance filter.</p>{% endif %}
+  {% else %}<p class="muted">Aucune opportunite de mot cle n'a passe le filtre de pertinence de Jev.</p>{% endif %}
   {% if dfs.serps %}
   <div>
-  <h3>Live Google results for the top keywords</h3>
+  <h3>Resultats Google en direct sur les principaux mots cles</h3>
   <table>
-    <tr><th>Keyword</th><th class="num">Site position</th><th>AI Overview</th><th>Top 3 results</th></tr>
+    <tr><th>Mot cle</th><th class="num">Position du site</th><th>Apercu IA</th><th>Top 3 des resultats</th></tr>
     {% for sp in dfs.serps %}<tr><td>{{ sp.keyword }}</td><td class="num">{{ sp.own_position or 'not in top 10' }}</td><td>{% if sp.ai_overview %}{% if sp.ai_overview_cites_site %}<span class="ok">yes, cites the site</span>{% else %}<span class="bad">yes, site not cited</span>{% endif %}{% else %}none{% endif %}</td><td>{{ sp.top[:3] | map(attribute='domain') | join(', ') }}</td></tr>{% endfor %}
   </table>
   </div>
@@ -210,8 +210,8 @@
 <!-- JEV -->
 {% if jev_available %}
 <section class="section">
-  <div class="kicker">Jev judgments</div>
-  <h2>How Jev reads the site</h2>
+  <div class="kicker">Jugements Jev</div>
+  <h2>Comment Jev lit le site</h2>
   <p class="lede">Site-level questions asked over the homepage and the list of page titles. Each card shows Jev's typed answer and the probability it gave each option.</p>
   <div class="jcards">
     {% for c in site_cards %}
@@ -223,13 +223,13 @@
     </div>
     {% endfor %}
     <div class="jcard stats">
-      <div class="type">This Jev run</div>
-      <div class="q">Every judgment in this report came from these requests.</div>
-      <div class="row"><span>Model</span><b>{{ ledger.model_returned or 'n/a' }}</b></div>
-      <div class="row"><span>Requests</span><b>{{ ledger.requests or 0 }}</b></div>
-      <div class="row"><span>Judgments</span><b>{{ n_judgments }}</b></div>
-      <div class="row"><span>Input tokens</span><b>{{ '{:,}'.format(ledger.input_tokens or 0) }}</b></div>
-      <div class="row"><span>Decisive answers</span><b>{{ decisive_share }}%</b></div>
+      <div class="type">Cette execution de Jev</div>
+      <div class="q">Chaque jugement de ce rapport provient de ces requetes.</div>
+      <div class="row"><span>Modele</span><b>{{ ledger.model_returned or 'n/a' }}</b></div>
+      <div class="row"><span>Requetes</span><b>{{ ledger.requests or 0 }}</b></div>
+      <div class="row"><span>Jugements</span><b>{{ n_judgments }}</b></div>
+      <div class="row"><span>Jetons d'entree</span><b>{{ '{:,}'.format(ledger.input_tokens or 0) }}</b></div>
+      <div class="row"><span>Reponses decisives</span><b>{{ decisive_share }}%</b></div>
       <div class="row"><span>Cost</span><b>${{ '%.4f' % (ledger.cost_usd or 0) }}</b></div>
     </div>
   </div>
@@ -240,20 +240,20 @@
   </div>
 </section>
 <section class="section">
-  <div class="kicker">Jev judgments</div>
-  <h2>Page quality heatmap</h2>
+  <div class="kicker">Jugements Jev</div>
+  <h2>Carte de qualite des pages</h2>
   <p class="lede">Every Score and yes or no answer on a 0 to 1 scale, for the pages Jev judged most important. Darker is better. A dash means the question did not apply, for example no meta description to judge.</p>
   {{ chart('jev_heatmap') }}
   <div class="avoid">
-  <h3>How sure was Jev?</h3>
-  <p>A Choice or Score answer is decisive at confidence {{ '%.2f' % act }} or above; a yes or no answer is decisive at P(yes) of {{ '%.2f' % yes }} or more, or {{ '%.2f' % no }} or less. Everything else is marked for a human check and flagged on its action.</p>
+  <h3>Quel etait le niveau de certitude de Jev ?</h3>
+  <p>Une reponse Choice ou Score est decisive a partir de {{ '%.2f' % act }} de confiance ; une reponse par oui ou non l'est a partir d'un P(oui) de {{ '%.2f' % yes }} ou plus, ou de {{ '%.2f' % no }} ou moins. Tout le reste est marque pour verification humaine and flagged on its action.</p>
   {{ chart('jev_confidence') }}
   </div>
   {% if jev_pairs %}
-  <h3>Pages that may compete for the same searches</h3>
-  <p>Code shortlisted {{ jev_pairs | length }} pairs with overlapping titles and headings; Jev judged whether a searcher would treat them as substitutes. The most likely competitors are shown; 0.6 or more becomes an action.</p>
+  <h3>Pages susceptibles de se disputer les memes recherches</h3>
+  <p>Le code a presélectionne {{ jev_pairs | length }} paires aux titres et intitules qui se recoupent ; Jev a juge si un internaute les traiterait comme interchangeables. Les plus probables sont affichees ; 0,6 ou plus devient une action.</p>
   <table>
-    <tr><th>Page A</th><th>Page B</th><th class="num">Title overlap</th><th class="num">P(compete)</th></tr>
+    <tr><th>Page A</th><th>Page B</th><th class="num">Recoupement des titres</th><th class="num">P(compete)</th></tr>
     {% for p in jev_pairs[:8] %}<tr><td class="url">{{ p.a }}</td><td class="url">{{ p.b }}</td><td class="num">{{ p.title_overlap }}</td><td class="num"><b>{{ '%.2f' % p.judgment.value }}</b></td></tr>{% endfor %}
   </table>
   {% endif %}
@@ -262,16 +262,16 @@
 
 {% if 'invest' in charts.svg %}
 <section class="section">
-  <div class="kicker">Jev judgments</div>
-  <h2>Where to invest</h2>
+  <div class="kicker">Jugements Jev</div>
+  <h2>Ou investir</h2>
   <p class="lede">Each page placed by how important Jev judged it to the business and how good its content is (mean of helpfulness, specificity and trust). Pages in the shaded corner matter and are weak: improving them is likely to pay back first.</p>
   {{ chart('invest') }}
   {% if invest_pages %}
   <table>
-    <tr><th>Important but weak</th><th class="num">Importance</th><th class="num">Quality</th><th>Jev suggests</th></tr>
+    <tr><th>Importante mais faible</th><th class="num">Importance</th><th class="num">Qualite</th><th>Jev suggere</th></tr>
     {% for p in invest_pages %}<tr><td class="url">{{ p.short }}</td><td class="num">{{ '%.2f' % p.importance }}</td><td class="num">{{ '%.2f' % p.quality }}</td><td>{{ (p.action or '–') | replace('_', ' ') }}</td></tr>{% endfor %}
   </table>
-  {% else %}<p class="muted">No page is both important (0.5 or more) and weak (below 0.5).</p>{% endif %}
+  {% else %}<p class="muted">Aucune page n'est a la fois importante (0,5 ou plus) et faible (sous 0,5).</p>{% endif %}
 </section>
 {% endif %}
 
@@ -283,16 +283,16 @@
   <h2>{{ name }}{% if scores.categories[c] is not none %} <span class="muted">{{ scores.categories[c] }}</span>{% endif %}</h2>
   {% if c == 'crawl' %}
   <div class="grid3">
-    <div>{{ chart('status', 'HTTP status of crawled URLs') }}</div>
+    <div>{{ chart('status', 'Statut HTTP des URL explorees') }}</div>
     <div>{{ chart('depth', 'Click depth from the homepage') }}</div>
   </div>
   <table class="facts avoid">
-    <tr><td>robots.txt</td><td>{% if site.robots.present %}<span class="ok">found</span>{% else %}<span class="bad">missing</span>{% endif %} · Googlebot {{ 'allowed' if search_bots.Googlebot else 'blocked' }} · Bingbot {{ 'allowed' if search_bots.Bingbot else 'blocked' }}</td></tr>
-    <tr><td>XML sitemap</td><td>{{ site.sitemaps.total_urls }} URLs in {{ site.sitemaps.files | length }} file(s)</td></tr>
+    <tr><td>robots.txt</td><td>{% if site.robots.present %}<span class="ok">present</span>{% else %}<span class="bad">absent</span>{% endif %} · Googlebot {{ 'autorise' if search_bots.Googlebot else 'bloque' }} · Bingbot {{ 'autorise' if search_bots.Bingbot else 'bloque' }}</td></tr>
+    <tr><td>Sitemap XML</td><td>{{ site.sitemaps.total_urls }} URLs in {{ site.sitemaps.files | length }} file(s)</td></tr>
     <tr><td>HTTPS</td><td>{{ 'yes' if site.https else 'no' }} · HTTP redirects to HTTPS: {{ 'yes' if site.probes.http_to_https else 'no' }}</td></tr>
-    <tr><td>Missing page status</td><td>{{ site.probes.not_found_status }}{% if site.probes.not_found_status == 404 %} <span class="ok">correct</span>{% endif %}</td></tr>
-    <tr><td>Rendering</td><td>{{ site.render.mode }}; homepage needed JavaScript rendering: {{ 'yes' if site.render.homepage_rendered else 'no' }}</td></tr>
-    <tr><td>Crawl limits</td><td>{{ site.limits.max_pages }} pages, depth {{ site.limits.max_depth }}{% if site.limits.hit_page_cap %} · <b>page cap reached: larger sites were sampled</b>{% endif %}</td></tr>
+    <tr><td>Statut d'une page inexistante</td><td>{{ site.probes.not_found_status }}{% if site.probes.not_found_status == 404 %} <span class="ok">correct</span>{% endif %}</td></tr>
+    <tr><td>Rendu</td><td>{{ site.render.mode }}; homepage needed JavaScript rendering: {{ 'yes' if site.render.homepage_rendered else 'no' }}</td></tr>
+    <tr><td>Limites d'exploration</td><td>{{ site.limits.max_pages }} pages, depth {{ site.limits.max_depth }}{% if site.limits.hit_page_cap %} · <b>page cap reached: larger sites were sampled</b>{% endif %}</td></tr>
   </table>
   {% elif c == 'onpage' %}
   <div class="grid3">
@@ -308,8 +308,8 @@
   </div>
   {% elif c == 'performance' %}
   {{ chart('lighthouse', 'Lighthouse lab scores for the homepage (one synthetic load each)') }}
-  {% if field %}<h3>Core Web Vitals, real Chrome users (75th percentile{% if not home_mobile.field_url %}, whole origin{% endif %})</h3>{{ chart('cwv') }}{% else %}<p class="muted">No Chrome UX Report field data for this site: it has too little traffic to be measured.</p>{% endif %}
-  {% if home_mobile and home_mobile.opportunities %}<h3>Largest lab opportunities (mobile homepage)</h3><table>{% for o in home_mobile.opportunities %}<tr><td>{{ o.title }}</td><td class="num">{{ o.savings_ms }} ms</td></tr>{% endfor %}</table>{% endif %}
+  {% if field %}<h3>Core Web Vitals, utilisateurs Chrome reels (75e percentile{% if not home_mobile.field_url %}, origine entiere{% endif %})</h3>{{ chart('cwv') }}{% else %}<p class="muted">Aucune donnee terrain Chrome UX Report pour ce site : il has too little traffic to be measured.</p>{% endif %}
+  {% if home_mobile and home_mobile.opportunities %}<h3>Principaux gisements en laboratoire (accueil mobile)</h3><table>{% for o in home_mobile.opportunities %}<tr><td>{{ o.title }}</td><td class="num">{{ o.savings_ms }} ms</td></tr>{% endfor %}</table>{% endif %}
   {% endif %}
   <h3>Actions</h3>
   {% for a in findings_by_cat[c] %}{{ finding(a) }}{% endfor %}
@@ -318,35 +318,35 @@
 
 <!-- APPENDIX -->
 <section class="section">
-  <div class="kicker">Appendix</div>
-  <h2>Page inventory</h2>
+  <div class="kicker">Annexe</div>
+  <h2>Inventaire des pages</h2>
   <table>
-    <tr><th>Page</th><th class="num">Depth</th><th class="num">Words</th><th class="num">In</th><th>Type (Jev)</th><th>Intent (Jev)</th><th class="num">Import.</th><th>Action (Jev)</th></tr>
+    <tr><th>Page</th><th class="num">Profondeur</th><th class="num">Mots</th><th class="num">In</th><th>Type (Jev)</th><th>Intent (Jev)</th><th class="num">Import.</th><th>Action (Jev)</th></tr>
     {% for p in pages %}<tr><td class="url">{{ p.short }}</td><td class="num">{{ p.depth if p.depth != 99 else '–' }}</td><td class="num">{{ p.words }}</td><td class="num">{{ p.inlinks }}</td><td>{{ (p.page_type or '–') | replace('_', ' ') }}</td><td>{{ p.intent or '–' }}</td><td class="num">{{ '%.2f' % p.importance if p.importance is not none else '–' }}</td><td>{{ {'keep_or_improve': 'keep', 'merge_or_remove': 'merge or remove'}.get(p.action, (p.action or '–') | replace('_', ' ')) }}</td></tr>{% endfor %}
   </table>
 </section>
 <section class="section">
-  <div class="kicker">Appendix</div>
-  <h2>Method, sources and limits</h2>
-  <h3>Formulas</h3>
-  <p><b>Area score</b> starts at 100 and subtracts, per finding, a severity amount (critical 25, high 12, medium 6, low 2, info 0) times (0.5 + 0.5 × share of pages affected). Site-wide findings count as full share. Content quality and AI search readiness blend 70% importance-weighted Jev judgments with 30% rules. Performance blends 50% Lighthouse mobile performance with 50% crawl observations.</p>
-  <p><b>Overall score</b> is the weighted mean of scored areas (weights in the scorecard). Unscored areas are left out, never counted as zero. A blocked site is capped at 20; a site without reliable HTTPS at 60.</p>
-  <p><b>Impact</b> = severity weight (critical 10, high 6, medium 3, low 1) × (0.6 + 0.4 × reach) × (0.6 + 0.8 × highest Jev importance among affected pages), scaled so the largest is 100. <b>Priority:</b> P1 for critical, or high with impact 40 or more; P2 for impact 30 or more or any high; P3 otherwise. <b>Quick win:</b> impact 35 or more with effort of hours.</p>
+  <div class="kicker">Annexe</div>
+  <h2>Methode, sources et limites</h2>
+  <h3>Formules</h3>
+  <p><b>Score par domaine</b> part de 100 et retire, pour chaque constat, un poids de gravite (critique 25, eleve 12, moyen 6, faible 2, information 0) multiplie par (0,5 + 0,5 × part des pages concernees). Un constat a l'echelle du site compte pour une portee pleine. La qualite du contenu et la visibilite dans les moteurs IA melangent 70 % de jugement Jev pondere par l'importance et 30 % de regles. La performance melange 50 % de performance Lighthouse mobile et 50 % d'observations d'exploration.</p>
+  <p><b>Score global</b> : moyenne ponderee des domaines evalues, selon les poids du tableau de notes. Un domaine non evalue est exclu du calcul, jamais compte zero. Un site bloque est plafonne a 20 ; un site sans HTTPS fiable, a 60.</p>
+  <p><b>Impact</b> = poids de gravite (critique 10, eleve 6, moyen 3, faible 1) × (0,6 + 0,4 × portee) × (0,6 + 0,8 × importance Jev la plus elevee parmi les pages concernees), ramene pour que le plus fort vaille 100. <b>Priorite :</b> P1 pour un constat critique, ou eleve avec un impact de 40 ou plus ; P2 pour un impact de 30 ou plus, ou tout constat eleve ; P3 sinon. <b>Gain rapide :</b> impact de 35 ou plus pour un effort de quelques heures.</p>
   <h3>Jev</h3>
-  <p>Model requested {{ ledger.model_requested or 'n/a' }}, returned {{ ledger.model_returned or 'n/a' }}. {{ ledger.requests or 0 }} requests, {{ ledger.input_tokens or 0 }} input tokens, {{ ledger.failed or 0 }} failed, {{ ledger.skipped_budget or 0 }} skipped by the budget cap. Cost ${{ '%.4f' % (ledger.cost_usd or 0) }} at ${{ ledger.usd_per_mtok or 0.042 }} per million input tokens (output is free). Page text sent to Jev is capped at 6,000 characters. Jev answers are model judgments, not measurements; decisive does not mean correct.</p>
+  <p>Modele demande {{ ledger.model_requested or 'n/a' }}, modele renvoye {{ ledger.model_returned or 'n/a' }}. {{ ledger.requests or 0 }} requetes, {{ ledger.input_tokens or 0 }} jetons d'entree, {{ ledger.failed or 0 }} en echec, {{ ledger.skipped_budget or 0 }} ecartes par le plafond de budget. Cout ${{ '%.4f' % (ledger.cost_usd or 0) }} a ${{ ledger.usd_per_mtok or 0.042 }} par million de jetons d'entree (la sortie est gratuite). Le texte de page envoye a Jev est plafonne a 6 000 caracteres. Les reponses de Jev sont des jugements de modele, pas des mesures : decisif ne veut pas dire correct.</p>
   {% if dfs %}<h3>DataForSEO</h3>
-  <p>{{ dfs.ledger.requests }} requests, ${{ '%.4f' % dfs.ledger.cost_usd }} as reported per call by DataForSEO, {{ dfs.ledger.failed }} failed, {{ dfs.ledger.skipped_budget }} skipped by the budget cap{% if dfs.reused_from %}; data reused from the collection at {{ dfs.reused_from }}{% endif %}. Location {{ dfs.location_code }}, language {{ dfs.language_code }}. Search volumes, difficulty and traffic (ETV) are DataForSEO estimates; positions are organic ranks at collection time.</p>{% endif %}
-  <h3>Limits</h3>
+  <p>{{ dfs.ledger.requests }} requetes, ${{ '%.4f' % dfs.ledger.cost_usd }} tels que DataForSEO les declare appel par appel, {{ dfs.ledger.failed }} en echec, {{ dfs.ledger.skipped_budget }} ecartes par le plafond de budget{% if dfs.reused_from %}; data reused from the collection at {{ dfs.reused_from }}{% endif %}. Location {{ dfs.location_code }}, language {{ dfs.language_code }}. Search volumes, difficulty and traffic (ETV) are DataForSEO estimates; positions are organic ranks at collection time.</p>{% endif %}
+  <h3>Limites</h3>
   <ul>
-    {% if not_judged %}<li>{{ not_judged | length }} pages were not judged by Jev (request failed or budget cap reached); they carry no Jev findings, which is not the same as passing.</li>{% endif %}
-    <li>The crawl covered {{ n_fetched }} URLs{% if site.limits.hit_page_cap %}, stopping at the page cap, so site-wide counts describe a sample{% endif %}. Orphan and depth findings only see links on crawled pages.</li>
-    {% if dfs %}<li>Rankings, keywords and backlinks come from DataForSEO's databases, not from Search Console or analytics. Nothing here measures actual visits or revenue.</li>{% else %}<li>No Search Console, analytics, backlink or keyword data was used (run with --full for DataForSEO). Nothing here measures rankings, traffic or revenue.</li>{% endif %}
-    <li>PageSpeed lab scores vary between runs. Field data exists only for sites with enough Chrome traffic.</li>
-    <li>Rules marked heuristic are editorial conventions, not search engine requirements.</li>
+    {% if not_judged %}<li>{{ not_judged | length }} pages n'ont pas ete jugees par Jev (requete en echec ou plafond de budget atteint) ; elles ne portent aucun constat Jev, ce qui ne veut pas dire qu'elles sont conformes.</li>{% endif %}
+    <li>L'exploration a couvert {{ n_fetched }} URL{% if site.limits.hit_page_cap %}, en s'arretant au plafond de pages : les comptages a l'echelle du site decrivent donc un echantillon{% endif %}. Les constats d'orphelines et de profondeur ne voient que les liens des pages explorees.</li>
+    {% if dfs %}<li>Les positions, les mots cles et les backlinks proviennent des bases DataForSEO, pas de la Search Console ni d'un outil d'analytics. Rien ici ne mesure des visites reelles ni du chiffre d'affaires.</li>{% else %}<li>Aucune donnee Search Console, analytics, backlink ou mot cle n'a ete utilisee (relancer avec --full pour DataForSEO). Rien ici ne mesure des positions, du trafic ni du chiffre d'affaires.</li>{% endif %}
+    <li>Les scores PageSpeed en laboratoire varient d'une mesure a l'autre. Les donnees terrain n'existent que pour les sites au trafic Chrome suffisant.</li>
+    <li>Les regles marquees heuristiques sont des conventions editoriales, pas des exigences des moteurs de recherche.</li>
   </ul>
   <h3>Sources</h3>
   <div class="sources">{% for src in sources %}<a href="{{ src }}">{{ src | replace('https://', '') }}</a>{% endfor %}</div>
-  <p class="caption">Generated {{ generated }} by jev-seo {{ d.tool.version }}. Crawl started {{ d.run.started_at }}.</p>
+  <p class="caption">Genere le {{ generated }} par jev-seo-fr {{ d.tool.version }}, fork ForgeOne. Exploration demarree le {{ d.run.started_at }}.</p>
 </section>
 </body>
 </html>

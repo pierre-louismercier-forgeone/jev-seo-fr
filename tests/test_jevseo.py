@@ -418,22 +418,22 @@ class RenderTests(unittest.TestCase):
     def test_all_formats(self):
         tmp, out = self.build()
         assert_document(self, out)
-        self.assertIn("## Priority actions", out["md"].read_text())
+        self.assertIn("## Actions prioritaires", out["md"].read_text())
         from openpyxl import load_workbook
 
         wb = load_workbook(out["xlsx"])
-        self.assertEqual(wb.sheetnames[:3], ["Summary", "Actions", "Pages"])
+        self.assertEqual(wb.sheetnames[:3], ["Synthese", "Actions", "Pages"])
         ws = wb["Actions"]
-        self.assertEqual(ws["E1"].value, "Status")
-        self.assertEqual(ws["C1"].value, "Priority")
-        summary = [c.value for row in wb["Summary"].iter_rows() for c in row if isinstance(c.value, str) and c.value.startswith("=")]
+        self.assertEqual(ws["E1"].value, "Statut")
+        self.assertEqual(ws["C1"].value, "Priorite")
+        summary = [c.value for row in wb["Synthese"].iter_rows() for c in row if isinstance(c.value, str) and c.value.startswith("=")]
         self.assertTrue(any("COUNTIF(Actions!$E:$E" in f for f in summary))
         self.assertTrue(ws.data_validations.dataValidation)
 
     def test_full_mode_renders_visibility(self):
         tmp, out = self.build(full=True)
         md = out["md"].read_text()
-        self.assertIn("## Search visibility (DataForSEO)", md)
+        self.assertIn("## Visibilite sur les moteurs (DataForSEO)", md)
         self.assertIn("boiler service leeds", md)
         self.assertNotIn("car insurance", md)
         from openpyxl import load_workbook
@@ -458,7 +458,7 @@ class RenderTests(unittest.TestCase):
         (tmp / "audit.json").write_text(json.dumps(data))
         self.assertIn("PARTIAL AUDIT", digest(data))
         out = build(tmp, ["pdf", "xlsx", "md"], log=lambda *_: None)
-        self.assertIn("Partial audit", out["md"].read_text())
+        self.assertIn("Audit partiel", out["md"].read_text())
         assert_document(self, out)
 
     def test_narrative_rejects_unknown_ids(self):

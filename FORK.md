@@ -90,6 +90,36 @@ severites et les seuils restent ceux de l'upstream.
 - Le rendu PDF degrade vers `report.html` au lieu de faire tomber tout le
   rendu. Le HTML est de toute facon le livrable ForgeOne.
 
+### 7. Rapport entierement francais
+
+Traduits : le squelette Markdown (`report/md.py`), les libelles partages
+(`report/__init__.py`), les notes de calcul et les messages d'audit partiel
+(`score.py`), les 16 regles Jev et les 6 regles DataForSEO, les en-tetes et
+les noms d'onglets du classeur (`report/xlsx.py`), le gabarit HTML complet
+(`templates/report.html.j2`) et les etiquettes des graphiques
+(`report/charts.py`). Les dates passent par une table de mois plutot que par
+la locale systeme, qui n'est pas garantie sur la machine de generation.
+
+Verification : un balayage du HTML genere ne trouve plus aucun marqueur
+anglais hors noms propres et termes techniques (Jev, DataForSEO, PageSpeed,
+Lighthouse, Core Web Vitals, robots.txt).
+
+### 8. Gabarit visuel ForgeOne
+
+- Fond near-white `#FBFCFE`, filets 1px, un seul bleu `#075CD8` et son halo.
+- **Figtree** (variable, OFL, embarquee) remplace Inter comme famille de texte
+  et de titre ; **JetBrains Mono** porte les chiffres et les etiquettes
+  techniques, en chiffres tabulaires.
+- Sections numerotees (`01`, `02`...) en mono bleu.
+- Le bleu est reserve a la marque et aux reperes : les gravites ont leur
+  propre gamme, pour qu'un etat ne soit jamais confondu avec un accent.
+- Les graphiques matplotlib sont recolores (palette categorielle, rampe de
+  chaleur, couleurs de gravite) et passent eux aussi en Figtree, sinon le CSS
+  seul laissait des graphiques magenta dans un rapport bleu.
+- Une feuille de style ecran complete la feuille d'impression A4 : le HTML est
+  le livrable tant que WeasyPrint n'est pas disponible. Le positionnement
+  absolu de la couverture, concu pour le A4, est repasse en flux a l'ecran.
+
 ## La langue des questions reste un point ouvert
 
 La doc TypeSafe dit que **l'anglais est la langue la plus forte de Jev**, et le
@@ -111,12 +141,11 @@ variantes, comparer les taux d'accord. Cout estime : quelques centimes.
 
 ## Ce qui n'est pas encore fait
 
-- Le squelette du rapport (titres de sections, phrases generees, chaines de
-  preuve dans `run_checks`) est encore en anglais. Les regles et les categories
-  sont traduites, pas le texte autour.
-- Les noms d'onglets et d'en-tetes du classeur XLSX.
-- Le gabarit visuel ForgeOne (near-white, #075CD8, Figtree) a la place du
-  gabarit upstream.
+- Aucun jugement Jev n'a jamais tourne : sans cle TypeSafe, la couche
+  jugement, les deux questions locales et les taxonomies de marche sont
+  validees par les tests, pas en conditions reelles.
+- Le PDF reste indisponible sur cette machine (Pango/GLib absents).
+- Les captures d'ecran de `docs/assets/` sont encore celles de l'upstream.
 
 ## Etat des tests
 

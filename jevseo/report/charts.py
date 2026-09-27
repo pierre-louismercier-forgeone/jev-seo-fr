@@ -20,23 +20,28 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from matplotlib.patches import FancyBboxPatch, Wedge  # noqa: E402
 from matplotlib.ticker import FuncFormatter, MaxNLocator  # noqa: E402
 
-SURFACE = "#fcfcfb"
-PANEL = "#f4f3ef"
-INK = "#0b0b0b"
-INK2 = "#52514e"
-MUTED = "#898781"
-GRID = "#e1e0d9"
-MAGENTA = "#d45bb6"
-CATEGORICAL = ["#d45bb6", "#1baf7a", "#4a3aa7", "#eb6834", "#2a78d6", "#eda100"]
-OTHER = "#c3c2b7"
-STATUS = {"critical": "#d03b3b", "high": "#ec835a", "medium": "#fab219", "low": "#8fb3d9", "good": "#0ca30c", "info": "#c3c2b7"}
-RAMP = ["#fbeaf5", "#f2c4e4", "#e691cf", "#d45bb6", "#a83a8c", "#6e2059"]
+SURFACE = "#FBFCFE"  # FR: gabarit ForgeOne
+PANEL = "#F5F7FB"
+INK = "#0A0E17"
+INK2 = "#3D4657"
+MUTED = "#8A93A6"
+GRID = "#E4E9F2"
+MAGENTA = "#075CD8"  # le bleu ForgeOne, nom upstream conserve pour limiter le diff
+# Bleu de marque en tete, puis une gamme lisible et distincte en niveaux de gris a l'impression.
+CATEGORICAL = ["#075CD8", "#128A5B", "#5B3FA8", "#E0722F", "#2E9BC4", "#D9A21B"]
+OTHER = "#C4CBD8"
+STATUS = {"critical": "#C8322F", "high": "#E0722F", "medium": "#D9A21B", "low": "#6E86A8", "good": "#128A5B", "info": "#C4CBD8"}
+RAMP = ["#EDF3FE", "#CBDEFA", "#93B8F2", "#4A8AE6", "#075CD8", "#053B8C"]
 CMAP = LinearSegmentedColormap.from_list("jev", RAMP)
 PRIORITY = {"P1": RAMP[5], "P2": RAMP[3], "P3": RAMP[1]}
 
-for _f in (Path(__file__).resolve().parent.parent / "fonts").glob("Inter-*.otf"):
-    font_manager.fontManager.addfont(str(_f))  # bundled, so charts match the PDF on every machine
-FONT = "Inter" if any("Inter" == f.name for f in font_manager.fontManager.ttflist) else "DejaVu Sans"
+# FR: Figtree d'abord (gabarit ForgeOne), Inter en repli, polices embarquees
+# pour que les graphiques soient identiques sur toutes les machines.
+for _pat in ("Figtree*.ttf", "Inter-*.otf"):
+    for _f in (Path(__file__).resolve().parent.parent / "fonts").glob(_pat):
+        font_manager.fontManager.addfont(str(_f))
+_installed = {f.name for f in font_manager.fontManager.ttflist}
+FONT = next((n for n in ("Figtree", "Inter") if n in _installed), "DejaVu Sans")
 plt.rcParams.update({
     "font.family": FONT,
     "font.size": 9,
@@ -113,9 +118,9 @@ def gauge(cs: ChartSet, value: int, grade: str, partial: bool = False) -> None:
     ax.add_patch(Wedge((0, 0), 1, 0, 360, width=0.16, color=GRID))
     ax.add_patch(Wedge((0, 0), 1, 90 - 360 * value / 100, 90, width=0.16, color=MAGENTA))
     ax.text(0, 0.08, f"{value}", ha="center", va="center", fontsize=40, fontweight="bold", color=INK)
-    ax.text(0, -0.38, f"grade {grade}  ·  out of 100", ha="center", va="center", fontsize=8.5, color=INK2)
+    ax.text(0, -0.38, f"note {grade}  ·  sur 100", ha="center", va="center", fontsize=8.5, color=INK2)
     if partial:
-        ax.text(0, -0.58, "partial audit", ha="center", va="center", fontsize=8.5, fontweight="bold", color=STATUS["critical"])
+        ax.text(0, -0.58, "audit partiel", ha="center", va="center", fontsize=8.5, fontweight="bold", color=STATUS["critical"])
     ax.set_xlim(-1.05, 1.05)
     ax.set_ylim(-1.05, 1.05)
     cs.save("gauge", fig)
@@ -129,7 +134,7 @@ def category_bars(cs: ChartSet, scores: dict, names: dict) -> None:
     for i, v in enumerate(vals):
         ax.barh(i, 100, color=PANEL, height=0.56)
         if v is None:
-            ax.text(2, i, "not assessed", va="center", fontsize=8, color=MUTED)
+            ax.text(2, i, "non evalue", va="center", fontsize=8, color=MUTED)
             continue
         ax.barh(i, v, color=CMAP(0.35 + 0.65 * v / 100), height=0.56)
         ax.text(v + 1.5, i, f"{v}", va="center", fontsize=9, fontweight="bold", color=INK)
@@ -190,7 +195,7 @@ def impact_effort(cs: ChartSet, actions: list[dict]) -> None:
     if not actions:
         return
     fig, ax = plt.subplots(figsize=(6.4, 2.85))
-    ax.axvspan(0.5, 2.5, ymin=0.5, ymax=1, color="#f7e3f1", zorder=0)
+    ax.axvspan(0.5, 2.5, ymin=0.5, ymax=1, color="#E7EFFD", zorder=0)
     ax.text(0.6, 103, "QUICK WINS", fontsize=7.5, fontweight="bold", color=RAMP[4])
     ax.text(4.4, 103, "BIG BETS", fontsize=7.5, fontweight="bold", color=INK2, ha="right")
     ax.text(0.6, 2, "FILL-INS", fontsize=7.5, fontweight="bold", color=MUTED)
@@ -324,9 +329,9 @@ def cwv_bullets(cs: ChartSet, field: dict | None) -> None:
     for ax, (m, v) in zip(axes, metrics):
         good, poor = v["good_max"], v["poor_min"]
         top = max(poor * 1.4, v["p75"] * 1.1)
-        ax.barh(0, good, color="#dff3df", height=0.7)
-        ax.barh(0, poor - good, left=good, color="#fdf0d0", height=0.7)
-        ax.barh(0, top - poor, left=poor, color="#f8dcdc", height=0.7)
+        ax.barh(0, good, color="#DCF0E7", height=0.7)
+        ax.barh(0, poor - good, left=good, color="#FAF0D4", height=0.7)
+        ax.barh(0, top - poor, left=poor, color="#F8DEDD", height=0.7)
         ax.plot([v["p75"]], [0], marker="D", color=INK, markersize=7)
         unit = v["unit"]
         ax.text(-top * 0.02, 0, m, ha="right", va="center", fontsize=9, fontweight="bold")
@@ -427,7 +432,7 @@ def invest_matrix(cs: ChartSet, points: list[dict]) -> None:
     if len(points) < 2:
         return
     fig, ax = plt.subplots(figsize=(6.4, 3.9))
-    ax.fill_between([0, 0.5], 0.5, 1.1, color="#f7e3f1", zorder=0, lw=0)  # data units: quality < 0.5, importance >= 0.5
+    ax.fill_between([0, 0.5], 0.5, 1.1, color="#E7EFFD", zorder=0, lw=0)  # data units: quality < 0.5, importance >= 0.5
     ax.axhline(0.5, color=GRID, lw=0.8)
     ax.axvline(0.5, color=GRID, lw=0.8)
     kw = {"transform": ax.transAxes, "fontsize": 7.5, "fontweight": "bold"}
@@ -494,7 +499,7 @@ def opportunities(cs: ChartSet, rows: list[dict]) -> None:
     if not rows:
         return
     fig, ax = plt.subplots(figsize=(6.4, 2.7))
-    ax.axvspan(0, 30, color="#f7e3f1", zorder=0)
+    ax.axvspan(0, 30, color="#E7EFFD", zorder=0)
     ax.text(1, 1.02, "EASIER TO WIN", transform=ax.get_xaxis_transform(), fontsize=7.5, fontweight="bold", color=RAMP[4])
     unknown = False
     for r in rows:

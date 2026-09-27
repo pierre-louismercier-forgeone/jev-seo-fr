@@ -12,20 +12,32 @@ from jevseo.checks import RULES
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 FONTS = Path(__file__).resolve().parent.parent / "fonts"
 # Bundled fonts (SIL Open Font License) so every machine renders the same design.
-FACES = [("Inter", 400, "Inter-Regular.otf"), ("Inter", 500, "Inter-Medium.otf"), ("Inter", 600, "Inter-SemiBold.otf"),
-         ("Inter", 700, "Inter-Bold.otf"), ("Inter", 800, "Inter-ExtraBold.otf"), ("Inter Display", 700, "InterDisplay-Bold.otf"),
-         ("Inter Display", 800, "InterDisplay-ExtraBold.otf"), ("JetBrains Mono", 500, "JetBrainsMono-Medium.ttf")]
+# FR: gabarit ForgeOne. Figtree (variable, OFL) remplace Inter comme famille
+# de texte et de titre ; JetBrains Mono reste la famille des donnees.
+FACES = [("Figtree", "100 900", "Figtree.ttf"), ("JetBrains Mono", "500", "JetBrainsMono-Medium.ttf"),
+         ("Inter", "400", "Inter-Regular.otf"), ("Inter", "700", "Inter-Bold.otf")]
 
 
 def font_css() -> str:
-    return "".join(f"@font-face {{ font-family: '{fam}'; font-weight: {w}; src: url('{(FONTS / f).as_uri()}'); }}\n" for fam, w, f in FACES if (FONTS / f).is_file())
+    return "".join(f"@font-face {{ font-family: '{fam}'; font-weight: {w}; font-display: swap; src: url('{(FONTS / f).as_uri()}'); }}\n" for fam, w, f in FACES if (FONTS / f).is_file())
+
+
+# FR: les noms de mois passent par une table plutot que par la locale
+# systeme, qui n'est pas garantie sur la machine qui genere le rapport.
+MOIS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet",
+        "aout", "septembre", "octobre", "novembre", "decembre"]
+
+
+def date_fr(dt) -> str:
+    jour = "1er" if dt.day == 1 else str(dt.day)
+    return f"{jour} {MOIS[dt.month - 1]} {dt.year}"
 
 
 def context(vm: dict) -> dict:
     d = vm["d"]
     return vm | {
         "css": font_css() + (TEMPLATES / "report.css").read_text(),
-        "date": datetime.fromisoformat(d["run"]["finished_at"]).strftime("%d %B %Y"),
+        "date": date_fr(datetime.fromisoformat(d["run"]["finished_at"])),
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "rule_count": len(RULES),
         "rule_findings": sum(1 for f in d["findings"] if f["origin"] == "rule"),

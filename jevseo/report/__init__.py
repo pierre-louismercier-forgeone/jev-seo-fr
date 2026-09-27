@@ -13,9 +13,9 @@ from urllib.parse import urlparse
 
 from jevseo.report import charts
 
-PRIORITY_TEXT = {"P1": "Fix first", "P2": "Plan next", "P3": "When convenient"}
-EFFORT_TEXT = {1: "Hours", 2: "About a day", 3: "Several days", 4: "A project"}
-JEV_COLUMNS = [("helpfulness", "helpful"), ("specificity", "specific"), ("trust", "trust"), ("citable", "citable"), ("answer_first", "answer 1st"), ("title_fit", "title"), ("meta_fit", "meta"), ("clear_next_step", "next step")]
+PRIORITY_TEXT = {"P1": "A traiter en premier", "P2": "A planifier", "P3": "Quand c'est possible"}
+EFFORT_TEXT = {1: "Quelques heures", 2: "Environ un jour", 3: "Plusieurs jours", 4: "Un chantier"}
+JEV_COLUMNS = [("helpfulness", "utilite"), ("specificity", "specificite"), ("trust", "confiance"), ("citable", "citabilite"), ("answer_first", "repond d'abord"), ("title_fit", "title"), ("meta_fit", "meta"), ("clear_next_step", "etape suivante")]
 NARRATIVE_KEYS = {"executive_summary", "strengths", "risks", "plan"}
 
 
@@ -122,12 +122,12 @@ def unverified_numbers(text: str, data: dict) -> list[str]:
 
 
 def lower(name: str) -> str:
-    """Lower-case an area name for running text, keeping acronyms such as AI."""
+    """Met un nom de domaine en minuscules dans le texte courant, sigles conserves."""
     return " ".join(w if w.isupper() else w.lower() for w in name.split())
 
 
 def auto_narrative(d: dict) -> dict:
-    """Evidence-only fallback used when no lead-agent narrative exists."""
+    """Repli fonde sur les seules preuves, quand aucun agent n'a redige la narration."""
     s = d["scores"]
     cats = {c: v for c, v in s["categories"].items() if v is not None}
     best = sorted(cats, key=lambda c: -cats[c])[:3]
@@ -137,20 +137,20 @@ def auto_narrative(d: dict) -> dict:
     quick = [a for a in acts if a["quick_win"]]
     names = s["category_names"]
     summary = (
-        f"{d['site']['domain']} scores {s['overall']} out of 100 (grade {s['grade']}) across {len(cats)} scored areas. "
-        f"The strongest areas are {', '.join(lower(names[c]) for c in best)}; the weakest are {', '.join(lower(names[c]) for c in worst)}. "
-        f"The audit produced {len(acts)} actions, {len(p1)} of them marked fix first and {len(quick)} quick wins."
+        f"{d['site']['domain']} obtient {s['overall']} sur 100 (note {s['grade']}) sur {len(cats)} domaines evalues. "
+        f"Les domaines les plus solides sont {', '.join(lower(names[c]) for c in best)} ; les plus faibles sont {', '.join(lower(names[c]) for c in worst)}. "
+        f"L'audit produit {len(acts)} actions, dont {len(p1)} a traiter en premier et {len(quick)} gains rapides."
     )
     return {
         "executive_summary": [summary],
-        "strengths": [f"{names[c]} scores {cats[c]}." for c in best],
+        "strengths": [f"{names[c]} obtient {cats[c]} sur 100." for c in best],
         "risks": [f"{a['action_id']}: {a['title']} ({a['evidence']})" for a in (p1 or acts)[:4]],
         "plan": [
-            {"horizon": "This week", "items": [f"{a['action_id']} {a['title']}" for a in (quick or acts)[:4]]},
-            {"horizon": "This month", "items": [f"{a['action_id']} {a['title']}" for a in acts if a["priority"] in ("P1", "P2") and a not in quick][:5]},
-            {"horizon": "This quarter", "items": [f"{a['action_id']} {a['title']}" for a in acts if a["priority"] == "P3"][:5]},
+            {"horizon": "Cette semaine", "items": [f"{a['action_id']} {a['title']}" for a in (quick or acts)[:4]]},
+            {"horizon": "Ce mois-ci", "items": [f"{a['action_id']} {a['title']}" for a in acts if a["priority"] in ("P1", "P2") and a not in quick][:5]},
+            {"horizon": "Ce trimestre", "items": [f"{a['action_id']} {a['title']}" for a in acts if a["priority"] == "P3"][:5]},
         ],
-        "author": "Automatic summary (no lead-agent narrative was written)",
+        "author": "Synthese automatique (aucune redaction d'agent n'a ete produite)",
         "automatic": True,
     }
 
@@ -165,12 +165,12 @@ def view_model(d: dict, folder: Path) -> dict:
         a["priority_text"] = PRIORITY_TEXT[a["priority"]]
         a["effort_text"] = EFFORT_TEXT[a["effort"]]
         a["short_urls"] = [short(u, domain) for u in a["urls"][:6]]
-        a["by"] = {"jev": "Jev judged", "dataforseo": "DataForSEO"}.get(a["origin"], "rule")
+        a["by"] = {"jev": "juge par Jev", "dataforseo": "DataForSEO"}.get(a["origin"], "regle")
         a["by_class"] = {"jev": "tag-jev", "dataforseo": "tag-dfs"}.get(a["origin"], "tag-rule")
 
     status_counts = Counter(str(p.get("status") or "error") for p in d["pages"] if p.get("kind") != "redirect")
     redirects = sum(1 for p in d["pages"] if p.get("kind") == "redirect")
-    depth_counts = Counter(p.get("depth") if p.get("depth", 99) < 99 else "not linked" for p in pages)
+    depth_counts = Counter(p.get("depth") if p.get("depth", 99) < 99 else "non lie" for p in pages)
     types = Counter(a["page_type"]["value"] for a in jp.values() if a)
     intents = Counter(a["intent"]["value"] for a in jp.values() if a)
     page_actions = Counter(a["action"]["value"] for a in jp.values() if a)
@@ -199,15 +199,15 @@ def view_model(d: dict, folder: Path) -> dict:
     charts.donut(cs, "severity", [(k, sev.get(k, 0)) for k in ("critical", "high", "medium", "low")], [charts.STATUS[k] for k in ("critical", "high", "medium", "low") if sev.get(k)], "actions")
     charts.severity_by_category(cs, acts, s["category_names"])
     charts.impact_effort(cs, acts)
-    charts.donut(cs, "page_types", types.most_common(), center="pages judged")
-    charts.donut(cs, "intents", intents.most_common(), center="pages judged")
-    charts.donut(cs, "page_actions", page_actions.most_common(), center="Jev verdicts")
-    charts.bars(cs, "status", list(status_counts), list(status_counts.values()) , "HTTP status", highlight={"200"})
-    dk = sorted(depth_counts, key=lambda k: 99 if k == "not linked" else k)
-    charts.bars(cs, "depth", [str(k) for k in dk], [depth_counts[k] for k in dk], "clicks from homepage")
+    charts.donut(cs, "page_types", types.most_common(), center="pages jugees")
+    charts.donut(cs, "intents", intents.most_common(), center="pages jugees")
+    charts.donut(cs, "page_actions", page_actions.most_common(), center="verdicts Jev")
+    charts.bars(cs, "status", list(status_counts), list(status_counts.values()) , "statut HTTP", highlight={"200"})
+    dk = sorted(depth_counts, key=lambda k: 99 if k == "non lie" else k)
+    charts.bars(cs, "depth", [str(k) for k in dk], [depth_counts[k] for k in dk], "clics depuis l'accueil")
     edges = [(0, 150, "<150"), (150, 300, "150+"), (300, 600, "300+"), (600, 1000, "600+"), (1000, 2000, "1k+"), (2000, 10**9, "2k+")]
-    charts.bars(cs, "words", [e[2] for e in edges], [sum(1 for p in pages if e[0] <= p["word_count"] < e[1]) for e in edges], "words of main content", highlight={"150+", "300+", "600+", "1k+", "2k+"})
-    charts.histogram(cs, "title_len", [len(p["title"]) for p in pages if p.get("title")], list(range(0, 121, 10)), 65, "title length (characters)")
+    charts.bars(cs, "words", [e[2] for e in edges], [sum(1 for p in pages if e[0] <= p["word_count"] < e[1]) for e in edges], "mots de contenu principal", highlight={"150+", "300+", "600+", "1k+", "2k+"})
+    charts.histogram(cs, "title_len", [len(p["title"]) for p in pages if p.get("title")], list(range(0, 121, 10)), 65, "longueur du title (caracteres)")
     charts.heatmap(cs, [short(u, domain)[:42] for u in ranked], [label for _, label in JEV_COLUMNS], matrix)
     charts.confidence_bars(cs, conf_rows)
     charts.lighthouse(cs, home_mobile, home_desktop)
@@ -220,7 +220,7 @@ def view_model(d: dict, folder: Path) -> dict:
     charts.site_map(cs, nodes, edges, site["final_url"])
     discovered = set(site["sitemaps"]["urls"]) | {l["url"] for p in d["pages"] for l in p.get("links_internal", [])} | {p["url"] for p in d["pages"]}
     indexable_n = sum(1 for p in pages if "noindex" not in f"{p.get('meta_robots') or ''} {p.get('x_robots') or ''}" and (not p.get("canonical") or p["canonical"] == p["url"]))
-    charts.funnel(cs, [("URLs discovered", len(discovered)), ("URLs crawled", len(d["pages"])), ("HTML pages (200)", len(pages)), ("Indexable", indexable_n), ("Judged by Jev", sum(1 for a in jp.values() if a))])
+    charts.funnel(cs, [("URL decouvertes", len(discovered)), ("URL explorees", len(d["pages"])), ("Pages HTML (200)", len(pages)), ("Indexables", indexable_n), ("Jugees par Jev", sum(1 for a in jp.values() if a))])
     invest = [{"label": short(u, domain), "importance": a["importance"]["value"], "quality": mean([a[k]["value"] for k in ("helpfulness", "specificity", "trust") if k in a])} for u, a in jp.items() if a]
     charts.invest_matrix(cs, invest)
 
@@ -274,7 +274,7 @@ def view_model(d: dict, folder: Path) -> dict:
     jev_site = d["jev"].get("site")
     site_cards = []
     if jev_site:
-        labels = {"business_model": "What kind of business is this?", "value_prop": "How clear is the offer on the homepage?", "entity_clarity": "Does the homepage say who, what and where?", "topical_focus": "How focused is the site's topic set?", "serves_local_area": "Does it serve a specific local area?"}
+        labels = {"business_model": "Quel type d'entreprise gere ce site ?", "value_prop": "L'offre est-elle claire des la page d'accueil ?", "entity_clarity": "L'accueil dit-il qui, quoi et ou ?", "topical_focus": "Le site est-il concentre sur un ensemble de sujets coherent ?", "serves_local_area": "L'entreprise dessert-elle une zone geographique precise ?"}
         for key, question in labels.items():
             a = jev_site[key]
             card = {"key": key, "question": question, "type": a["type"], "band": a["band"]}
