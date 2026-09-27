@@ -203,6 +203,35 @@ def page_locale(page: dict) -> bool:
     return False
 
 
+def signaux_contact(texte: str) -> dict:
+    """Coordonnees reperees sur TOUTE la page, pas seulement dans l'extrait.
+
+    Pourquoi ce detour : l'etat envoye a Jev est plafonne a 6 000 caracteres,
+    or les coordonnees vivent presque toujours dans le pied de page, donc
+    au-dela du plafond. Sans extraction prealable, Jev repondait « pas de
+    contact » sur des pages qui en portaient un : une reponse juste sur le
+    fond, mais obtenue pour une mauvaise raison, donc non fiable.
+
+    Le repo pose la regle « le code ne demande jamais ce qu'il peut voir » :
+    reperer un telephone ou un email est une correspondance de chaine, pas un
+    jugement. Ce qui reste un jugement, et qu'on laisse a Jev, c'est de savoir
+    si ces coordonnees sont propres au lieu que la page vise.
+    """
+    import re as _re
+
+    t = texte or ""
+    tels = _re.findall(r"(?:\+33|0)\s?\d(?:[\s.\-]?\d{2}){4}", t)
+    mails = _re.findall(r"[\w.+-]+@[\w-]+\.[\w.]{2,}", t)
+    # Adresse postale francaise : numero, voie, code postal a 5 chiffres, ville.
+    adresses = _re.findall(r"\d{1,4}[,\s][^,\n]{4,60}?,?\s\d{5}\s+[A-ZÀ-Þ][\wÀ-ÿ'’ -]{2,30}", t)
+    return {
+        "telephones": sorted(set(tels))[:3],
+        "emails": sorted(set(mails))[:3],
+        "adresses": [a.strip() for a in sorted(set(adresses))[:3]],
+        "present": bool(tels or mails or adresses),
+    }
+
+
 # Deux questions propres au SEO local francais, le pattern majoritaire du
 # portefeuille. L'upstream a `serves_local_area` au niveau du site mais rien
 # au niveau de la page ville, alors que c'est la que se joue le risque.
@@ -218,10 +247,12 @@ def questions_locales(page: dict, choice, noul, score) -> dict:
                 "First-hand local proof: named jobs done there, local customer reviews, photos of local work, the team who covers it",
             ],
         ),
-        "coordonnees_visibles": noul(
-            "Does `page` show contact details a local visitor can act on immediately?",
-            "A phone number, an address or a contact form is present on the page itself",
-            "The visitor has to navigate elsewhere to find how to make contact",
+        # Code extrait les coordonnees (page entiere) ; Jev juge seulement si
+        # elles sont propres au lieu vise. Voir signaux_contact().
+        "contact_local": noul(
+            "Do the contact details in `page.contact` belong to the place `page` targets, rather than to a head office elsewhere?",
+            "At least one phone, address or email is presented as the contact for this place",
+            "The only contact details belong to a head office or another location, or none are specific to this place",
         ),
     }
 

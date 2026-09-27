@@ -34,7 +34,7 @@ JEV_RULES = {
     # la page n'est qu'un nom de ville pose sur du texte generique, ce qui est
     # exactement ce que Google qualifie de page satellite.
     "jev_preuve_locale": ("content", "high", "Pages ville sans preuve d'activite sur place", "Ajoutez du concret local et verifiable : chantiers ou dossiers traites dans cette ville, quartiers desservis, delais d'intervention reels, avis de clients de la ville, equipe qui couvre le secteur. Le nom de la ville dans un texte generique ne suffit pas.", "doorway", 3),
-    "jev_coordonnees_locales": ("content", "medium", "Pages ville sans moyen de contact direct", "Faites figurer sur la page ville elle-meme un telephone, une adresse ou un formulaire. Un visiteur local en recherche active ne doit pas avoir a naviguer pour vous joindre.", "starter", 1),
+    "jev_coordonnees_locales": ("content", "medium", "Pages ville dont le seul contact est le siege", "Donnez a chaque page ville un contact rattache a ce lieu : ligne locale, adresse de l'antenne, ou a defaut une mention explicite de la zone couverte depuis le siege. Un numero de siege sans rattachement local affaiblit le signal de proximite.", "starter", 1),
     "jev_cannibalization": ("content", "medium", "Pages qui se disputent les memes recherches", "Tranchez : une page par besoin de recherche. Fusionnez, differenciez, ou canonicalisez la plus faible.", "canonical", 2),
 }
 LOW = 0.45  # normalised Score below this becomes a finding
@@ -50,7 +50,7 @@ DFS_RULES = {
     "dfs_aio_not_cited": ("ai", "low", "Apercus IA qui ne citent pas le site", "Regardez qui est cite aujourd'hui et assurez-vous que la page repond directement a la recherche. Google indique qu'aucune exigence supplementaire n'existe pour apparaitre dans les Apercus IA au-dela de l'eligibilite normale a la recherche.", "ai", 2),
 }
 LABEL = {"helpfulness": "utilite", "specificity": "specificite", "trust": "confiance", "clear_next_step": "P(suite evidente)", "title_fit": "adequation du title",
-         "meta_fit": "adequation de la meta description", "h1_fit": "P(le H1 enonce le sujet)", "answer_first": "P(ouvre sur l'essentiel)", "citable": "citabilite", "preuve_locale": "preuve locale", "coordonnees_visibles": "P(contact visible)"}
+         "meta_fit": "adequation de la meta description", "h1_fit": "P(le H1 enonce le sujet)", "answer_first": "P(ouvre sur l'essentiel)", "citable": "citabilite", "preuve_locale": "preuve locale", "contact_local": "P(contact local)"}
 SITE_LEVEL = {
     "dfs_striking", "dfs_existing_page", "dfs_new_page", "dfs_backlink_gap", "dfs_broken_backlinks", "dfs_aio_not_cited",
     "robots_missing", "robots_blocks_site", "sitemap_missing", "sitemap_errors", "soft_404", "host_variant", "no_https",
@@ -118,7 +118,7 @@ def jev_findings(crawl: dict, judged: dict) -> list[dict]:
         # FR: ne s'appliquent qu'aux pages qui portent ces questions, donc aux
         # pages locales reperees par fr.page_locale().
         ("jev_preuve_locale", "preuve_locale", lambda a: a["value"] < LOW, None),
-        ("jev_coordonnees_locales", "coordonnees_visibles", lambda a: a["value"] < 0.5, None),
+        ("jev_coordonnees_locales", "contact_local", lambda a: a["value"] < 0.5, None),
         ("jev_citable", "citable", lambda a: a["value"] < LOW, None),
         ("jev_rewrite", "action", lambda a: a["value"] in ("rewrite", "merge_or_remove"), None),
     ]

@@ -74,6 +74,9 @@ MODELS_API = PROVIDERS[PROVIDER]["models_api"]
 MODEL = os.environ.get("JEVSEO_MODEL") or PROVIDERS[PROVIDER]["model"]
 USD_PER_MTOK = 0.042  # docs.typesafe.ai/models et openrouter.ai/typesafe/jev-1.13, releve le 2026-09-27
 PAGE_TEXT_CHARS = 6000
+# Statuts reessayables : surcharge et indisponibilite cote fournisseur, plus
+# les erreurs de edge Cloudflare propres au passage par OpenRouter.
+RETRY_STATUS = frozenset({429, 500, 502, 503, 529, 520, 521, 522, 523, 524})
 ACT = 0.80  # Choice and Score confidence at or above this is decisive
 YES, NO = 0.80, 0.20  # Noul decisive bands (Noul has no confidence field)
 
@@ -247,6 +250,9 @@ def page_state(p: dict, site_ctx: dict) -> dict:
             "word_count": p.get("word_count"),
             "opening": opening(p),
             "calls_to_action": p.get("calls_to_action", []),
+            # FR: extraites de la page ENTIERE, car les coordonnees vivent dans
+            # le pied de page, au-dela du plafond de 6 000 caracteres.
+            "contact": fr.signaux_contact(text),
             "text": text[:PAGE_TEXT_CHARS],
             "text_truncated": len(text) > PAGE_TEXT_CHARS,
         },
@@ -422,7 +428,11 @@ class Jev:
                         time.sleep(2**attempt)
                         continue
                     raise RuntimeError(type(err).__name__) from None
-                if r.status_code in (429, 529, 502, 503) and attempt < 4:
+                # FR: OpenRouter est derriere Cloudflare, qui emet des 52x transitoires
+                # (520 inconnu, 521 origine morte, 522/524 timeouts). L'upstream, ecrit
+                # pour TypeSafe en direct, ne les reessayait pas : 6 pages sur 28 se
+                # perdaient silencieusement au premier essai.
+                if r.status_code in RETRY_STATUS and attempt < 4:
                     time.sleep(retry_after(r.headers.get("retry-after"), attempt))
                     continue
                 if r.status_code != 200:

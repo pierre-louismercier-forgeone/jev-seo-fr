@@ -14,6 +14,8 @@ FONTS = Path(__file__).resolve().parent.parent / "fonts"
 # Bundled fonts (SIL Open Font License) so every machine renders the same design.
 # FR: gabarit ForgeOne. Figtree (variable, OFL) remplace Inter comme famille
 # de texte et de titre ; JetBrains Mono reste la famille des donnees.
+# La variable couvre 100-900 pour le navigateur ; les instances statiques
+# servent a matplotlib (voir charts.py) et de repli pour WeasyPrint.
 FACES = [("Figtree", "100 900", "Figtree.ttf"), ("JetBrains Mono", "500", "JetBrainsMono-Medium.ttf"),
          ("Inter", "400", "Inter-Regular.otf"), ("Inter", "700", "Inter-Bold.otf")]
 

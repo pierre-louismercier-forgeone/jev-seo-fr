@@ -552,16 +552,16 @@ class FournisseurTests(unittest.TestCase):
                       ("JEVSEO_PROVIDER", "JEVSEO_MODEL", "TYPESAFE_API_KEY", "JEV_API_KEY", "OPENROUTER_API_KEY")}
         for k in self.saved:
             os.environ.pop(k, None)
-        # Isole du .env du depot et de ~/Desktop/Keys/.env : sans cela le test
-        # depend des cles reellement installees sur la machine.
-        self.tmp = Path(tempfile.mkdtemp())
-        (self.tmp / "vide.env").write_text("")
-        os.environ["JEVSEO_ENV_FILE"] = str(self.tmp / "vide.env")
-        self.addCleanup(shutil.rmtree, self.tmp, True)
+        # Isole des fichiers .env reels. JEVSEO_ENV_FILE ne suffit pas : env.py
+        # l'AJOUTE a ./.env, <repo>/.env et ~/Desktop/Keys/.env. On neutralise
+        # donc la liste elle-meme, sinon le test depend des cles installees.
+        from jevseo import env as _env
+        self._env, self._vraies_key_files = _env, _env.key_files
+        _env.key_files = lambda: []
         self.addCleanup(self._restore)
 
     def _restore(self):
-        self.os.environ.pop("JEVSEO_ENV_FILE", None)
+        self._env.key_files = self._vraies_key_files
         for k, v in self.saved.items():
             if v is None:
                 self.os.environ.pop(k, None)
@@ -614,3 +614,31 @@ class FournisseurTests(unittest.TestCase):
         self.assertAlmostEqual(client.cost(), 0.042, places=6)
         client.ledger["billed_usd"] = 0.0311                # cout renvoye par le fournisseur
         self.assertAlmostEqual(client.cost(), 0.0311, places=6)
+
+
+class ContactTests(unittest.TestCase):
+    """FR: les coordonnees sont extraites par le code, pas devinees par Jev."""
+
+    def test_extraction_telephone_email_adresse(self):
+        from jevseo import fr
+        c = fr.signaux_contact("Cabinet Wegelin 161 Cours Tolstoi, 69100 Villeurbanne "
+                               "Telephone : 04 37 43 00 29 Email : info@clw.fr")
+        self.assertIn("04 37 43 00 29", c["telephones"])
+        self.assertIn("info@clw.fr", c["emails"])
+        self.assertTrue(any("69100" in a for a in c["adresses"]))
+        self.assertTrue(c["present"])
+
+    def test_page_sans_contact(self):
+        from jevseo import fr
+        self.assertFalse(fr.signaux_contact("Nous intervenons partout en France.")["present"])
+        self.assertFalse(fr.signaux_contact("")["present"])
+
+    def test_contact_extrait_hors_fenetre_envoyee_a_jev(self):
+        """Le pied de page tombe au-dela des 6 000 caracteres : c'est tout l'interet."""
+        from jevseo import fr, jev
+        texte = "blabla " * 1200 + "Telephone : 01 60 00 00 00"
+        self.assertGreater(len(texte), jev.PAGE_TEXT_CHARS)
+        etat = jev.page_state({"url": "https://x.fr/a", "text_excerpt": texte}, {})
+        self.assertTrue(etat["page"]["text_truncated"])
+        self.assertNotIn("01 60 00 00 00", etat["page"]["text"])
+        self.assertIn("01 60 00 00 00", etat["page"]["contact"]["telephones"])

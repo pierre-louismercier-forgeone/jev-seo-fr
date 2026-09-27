@@ -37,7 +37,11 @@ PRIORITY = {"P1": RAMP[5], "P2": RAMP[3], "P3": RAMP[1]}
 
 # FR: Figtree d'abord (gabarit ForgeOne), Inter en repli, polices embarquees
 # pour que les graphiques soient identiques sur toutes les machines.
-for _pat in ("Figtree*.ttf", "Inter-*.otf"):
+# FR: matplotlib ne sait pas exploiter l'axe de graisse d'une police
+# variable ; sans instances statiques il retombe sur 300 partout et le
+# gras disparait des graphiques. On charge donc Figtree-Regular/Bold,
+# generees depuis la variable, et jamais Figtree.ttf elle-meme.
+for _pat in ("Figtree-*.ttf", "Inter-*.otf"):
     for _f in (Path(__file__).resolve().parent.parent / "fonts").glob(_pat):
         font_manager.fontManager.addfont(str(_f))
 _installed = {f.name for f in font_manager.fontManager.ttflist}

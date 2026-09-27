@@ -16,7 +16,7 @@ from jevseo.report import JEV_COLUMNS
 
 JEV_LABELS = {"helpfulness": "Utilite", "specificity": "Specificite", "trust": "Confiance", "citable": "Citabilite", "answer_first": "Repond d'abord",
               "title_fit": "Adequation title", "meta_fit": "Adequation meta", "clear_next_step": "Etape suivante",
-              "preuve_locale": "Preuve locale", "coordonnees_visibles": "Contact visible"}
+              "preuve_locale": "Preuve locale", "contact_local": "Contact local"}
 INK = "0B0B0B"
 JEV = "D45BB6"
 SOFT = "FBEAF5"

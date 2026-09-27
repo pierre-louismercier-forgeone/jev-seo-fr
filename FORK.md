@@ -151,6 +151,61 @@ divergent sans qu'une seule ligne du site ait change. `JEVSEO_MODEL` surcharge.
 OpenRouter renvoie `usage.cost`, le cout reellement facture. Quand il est
 present, il fait foi dans le registre ; sinon on garde le calcul par jetons.
 
+### 10. Premier audit reel avec jugements Jev (27 septembre 2026)
+
+Passe sur clw.fr via OpenRouter, 30 pages, **34 requetes, 162 363 jetons
+d'entree, 0,0068 $, 0 echec**. Le contrat OpenRouter se comporte exactement
+comme la doc TypeSafe : racine `answers` / `model` / `provider` / `usage`, et
+`usage.cost` donne le cout reellement facture.
+
+**Jev juge correctement du contenu francais avec des instructions anglaises.**
+Premier test isole sur une page serrurier fictive : type de page `service`
+a 1,00 de confiance, lieu cible a 0,98, preuve locale a 1,87/3 avec 0,87 de
+probabilite sur « des details locaux concrets ». Lecture juste et nuancee.
+
+Trois defauts trouves et corriges par ce run :
+
+**a. 6 requetes sur 28 perdues en silence.** Toutes en HTTP 520, une erreur
+transitoire du edge Cloudflare devant OpenRouter. L'upstream, ecrit pour
+TypeSafe en direct, ne reessayait que sur 429/529/502/503. Consequence : 24
+pages jugees sur 30, et un score **meilleur** (90 au lieu de 89) parce que les
+pages perdues ne portaient aucun constat. Une perte de donnees qui flatte le
+resultat est le pire type de bug. `RETRY_STATUS` couvre desormais les 52x.
+
+**b. `coordonnees_visibles` avait raison pour une mauvaise raison.** La
+question repondait « pas de contact » sur des pages qui en portaient un : les
+coordonnees vivent dans le pied de page, donc **au-dela du plafond de 6 000
+caracteres** envoye a Jev. Meme classe d'erreur que le bug du fil d'Ariane
+documente dans l'evaluation upstream : regarder ce qu'on donne a lire avant
+d'accuser la question.
+
+Corrige selon la regle du repo, « le code ne demande jamais ce qu'il peut
+voir » : `fr.signaux_contact()` extrait telephones, emails et adresses de la
+page **entiere** par correspondance de chaine, les passe dans l'etat, et la
+question devient un vrai jugement, `contact_local` : ces coordonnees
+appartiennent-elles au lieu que la page vise, ou a un siege ailleurs ?
+
+Effet mesure : de 0,14-0,17 en zone grise a **0,05-0,07 en bande decisive
+« non »**. Meme conclusion, mais fondee. Sur clw.fr, les 22 pages ville ne
+portent que le numero du siege de Villeurbanne.
+
+**c. Les graphiques avaient perdu le gras.** matplotlib ne sait pas exploiter
+l'axe de graisse d'une police variable et retombait sur 300 partout. Des
+instances statiques Figtree-Regular et Figtree-Bold sont generees depuis la
+variable avec `fontTools` ; le HTML garde la variable, que les navigateurs
+gerent.
+
+**Validation du filtre geographique, en conditions reelles :** 26 paires
+soumises a Jev, **zero jugee concurrente**, aucun constat de cannibalisation.
+C'est le comportement attendu sur une architecture ville x service correcte.
+Sans le filtre, l'upstream aurait envoye 40 paires ville contre ville a un
+modele qui, les titres etant quasi identiques, aurait repondu oui.
+
+**Constats produits sur clw.fr** : `jev_preuve_locale` (severite elevee, le
+seul constat eleve de l'audit), `jev_coordonnees_locales`, plus
+`jev_local_schema`, `jev_specificity`, `jev_trust`, `jev_meta_fit` et
+`jev_answer_first`. Score 89 (B, partiel), 15 actions.
+
 ## La langue des questions reste un point ouvert
 
 La doc TypeSafe dit que **l'anglais est la langue la plus forte de Jev**, et le
@@ -172,16 +227,17 @@ variantes, comparer les taux d'accord. Cout estime : quelques centimes.
 
 ## Ce qui n'est pas encore fait
 
-- Aucun jugement Jev n'a jamais tourne : en l'absence de cle, la couche
-  jugement, les deux questions locales et les taxonomies de marche sont
-  validees par les tests, pas en conditions reelles. Le cablage des deux
-  fournisseurs est teste, l'aller-retour reel ne l'est pas encore.
+- L'A/B francais contre anglais des questions n'a pas encore tourne. On sait
+  desormais que l'anglais marche sur du contenu francais ; on ne sait pas si
+  le francais ferait mieux.
+- Un seul site teste, et il est bien construit. La regle `doorway_pages` n'a
+  toujours pas ete vue se declencher sur un vrai site.
 - Le PDF reste indisponible sur cette machine (Pango/GLib absents).
 - Les captures d'ecran de `docs/assets/` sont encore celles de l'upstream.
 
 ## Etat des tests
 
-`python -m unittest discover -s tests` : **50 tests, tous verts**, dont 12
+`python -m unittest discover -s tests` : **53 tests, tous verts**, dont 15
 nouveaux couvrant les correctifs francais. Les tests de rendu acceptent
 desormais `report.html` quand WeasyPrint est indisponible, et exigent toujours
 qu'un document soit produit.
