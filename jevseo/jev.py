@@ -133,7 +133,7 @@ ACTIONS = {
 }
 
 
-def page_questions(p: dict) -> dict:
+def page_questions(p: dict, corpus: list[dict] | None = None) -> dict:
     q = {
         "page_type": choice("Which kind of page is `page`?", PAGE_TYPES),
         "intent": choice("Which search need does `page` best serve?", INTENTS),
@@ -198,7 +198,7 @@ def page_questions(p: dict) -> dict:
     }
     # FR: une page a vocation locale porte deux questions de plus, la ou se
     # joue le risque de page satellite.
-    if fr.page_locale(p):
+    if fr.page_locale(p, corpus):
         q.update(fr.questions_locales(p, choice, noul, score))
     if p.get("title"):
         q["title_fit"] = score(
@@ -531,10 +531,10 @@ def judge(crawl: dict, pages: list[dict], budget_usd: float, log=print, dfs: dic
         "name": home.get("title"),
         "homepage_summary": (home.get("meta_description") or "") + " " + (home.get("text_excerpt") or "")[:600],
     }
-    out["questions"] = {"site": site_q, "page_example": page_questions(home)}
+    out["questions"] = {"site": site_q, "page_example": page_questions(home, pages)}
 
     def one(p):
-        qs = page_questions(p)
+        qs = page_questions(p, pages)
         is_home = p["url"] == home["url"]
         if is_home:
             qs.pop("page_type")  # code knows which page is the homepage; Jev is never asked what code can see

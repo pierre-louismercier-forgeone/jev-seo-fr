@@ -679,3 +679,53 @@ class LangueQuestionsTests(unittest.TestCase):
         """Resultat mesure : EN decisif a 76 %, FR a 65 %. Voir scripts/ab_langue.py."""
         from jevseo import fr
         self.assertEqual(fr.LANGUE_QUESTIONS, "en")
+
+
+class PageLocaleTests(unittest.TestCase):
+    """FR: nommer un lieu ne suffit pas a faire une page ville.
+
+    Regression publi3.com : quatre articles de reference ("Geely avec Como sur
+    Paris", "Club Med a Liege") recoltaient un constat « page ville sans
+    contact local » sur un site qui n'a aucune page ville.
+    """
+
+    CAS_CLIENT = [
+        {"url": "https://x.fr/geely", "title": "Geely... avec Como sur Paris", "h1": ["Geely… avec Como sur Paris"]},
+        {"url": "https://x.fr/byblos", "title": "Byblos, la Cite millenaire a Paris", "h1": ["Byblos, la Cite millenaire a Paris"]},
+        {"url": "https://x.fr/clubmed", "title": "Club Med that's esprit libre... aussi a Liege", "h1": ["Club Med a Liege"]},
+    ]
+    PAGES_VILLE = [
+        {"url": "https://y.fr/nantes", "title": "Serrurier a Nantes | Acme", "h1": ["Serrurier a Nantes"]},
+        {"url": "https://y.fr/reims", "title": "Serrurier a Reims | Acme", "h1": ["Serrurier a Reims"]},
+        {"url": "https://y.fr/paris", "title": "Serrurier sur Paris et Ile de France | Acme", "h1": ["Serrurier sur Paris et Ile de France"]},
+    ]
+
+    def test_cas_clients_isoles_ne_sont_pas_des_pages_ville(self):
+        from jevseo import fr
+        for p in self.CAS_CLIENT:
+            self.assertTrue(fr._nomme_un_lieu(p), "le titre nomme bien un lieu")
+            self.assertFalse(fr.page_locale(p, self.CAS_CLIENT), p["title"])
+
+    def test_une_famille_de_gabarit_est_locale(self):
+        from jevseo import fr
+        for p in self.PAGES_VILLE:
+            self.assertTrue(fr.page_locale(p, self.PAGES_VILLE), p["title"])
+
+    def test_nom_de_lieu_compose_avec_connecteur(self):
+        """« Paris et Ile de France » est une vraie page ville, juste plus longue."""
+        from jevseo import fr
+        self.assertTrue(fr.paire_geographique(
+            "Serrurier sur Paris et Ile de France | Acme", "Serrurier a Nantes | Acme"))
+        self.assertTrue(fr.paire_geographique("Serrurier au Havre", "Serrurier a La Rochelle"))
+
+    def test_sans_corpus_on_retombe_sur_la_detection_de_lieu(self):
+        from jevseo import fr
+        self.assertTrue(fr.page_locale(self.PAGES_VILLE[0]))
+        self.assertFalse(fr.page_locale({"url": "https://y.fr/a", "title": "Nos tarifs", "h1": ["Nos tarifs"]}))
+
+    def test_les_questions_locales_ne_sont_posees_qu_aux_pages_ville(self):
+        from jevseo import jev
+        p_ville = dict(self.PAGES_VILLE[0], text_excerpt="x", word_count=300)
+        p_cas = dict(self.CAS_CLIENT[0], text_excerpt="x", word_count=300)
+        self.assertIn("preuve_locale", jev.page_questions(p_ville, self.PAGES_VILLE))
+        self.assertNotIn("preuve_locale", jev.page_questions(p_cas, self.CAS_CLIENT))

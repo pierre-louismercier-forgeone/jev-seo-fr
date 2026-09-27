@@ -65,6 +65,10 @@ VETO_SUPPRESSION_MOTS = 600
 
 # Prepositions de lieu francaises, retirees avant de comparer deux titres :
 # "Recouvrement a Nantes" et "Recouvrement sur Lyon" suivent le meme gabarit.
+# Connecteurs qui peuvent apparaitre DANS un nom de lieu compose :
+# "Paris et Ile de France", "La Rochelle", "Le Havre", "Aix-en-Provence".
+CONNECTEURS_LIEU = {"et", "la", "le", "les", "l", "d", "saint", "sainte"}
+
 PREPOSITIONS_LIEU = {"a", "à", "au", "aux", "en", "sur", "dans", "de", "du", "des", "d", "pres", "près", "proche", "autour", "region", "région"}
 
 
@@ -110,8 +114,12 @@ def paire_geographique(titre_a: str, titre_b: str) -> bool:
         return False  # un titre est inclus dans l'autre : ce n'est pas un gabarit
     # Ce qui varie doit etre un lieu : nom propre, ou repere chiffre
     # (arrondissement "3e", departement "92"), frequents en local francais.
-    lieu = lambda t: t[:1].isupper() or any(c.isdigit() for c in t)
-    propre = lambda jetons: all(lieu(t) for t in jetons) and len(jetons) <= 4
+    # Les connecteurs en minuscule sont toleres A L'INTERIEUR du nom de lieu :
+    # sans eux, "Paris et Ile de France" etait rejete alors que c'est une vraie
+    # page ville, seulement plus longue que ses soeurs.
+    lieu = lambda t: t[:1].isupper() or any(c.isdigit() for c in t) or t.lower() in CONNECTEURS_LIEU
+    propre = lambda jetons: (all(lieu(t) for t in jetons) and len(jetons) <= 5
+                             and any(t[:1].isupper() for t in jetons))
     return propre(diff_a) and propre(diff_b)
 
 
@@ -183,15 +191,8 @@ def types_page(base: dict) -> dict:
     return fusion
 
 
-def page_locale(page: dict) -> bool:
-    """La page vise-t-elle explicitement un lieu ?
-
-    Heuristique sans liste de villes : une preposition de lieu suivie d'un
-    nom propre dans le titre ou le H1. Couvre "Serrurier a Meaux",
-    "Recouvrement sur Lyon", "Plombier en Essonne". Volontairement prudente :
-    un faux negatif coute deux questions non posees, un faux positif fait
-    juger une page nationale sur des criteres locaux.
-    """
+def _nomme_un_lieu(page: dict) -> bool:
+    """Le titre ou le H1 contient-il une preposition de lieu suivie d'un nom propre ?"""
     import re as _re
 
     textes = [page.get("title") or ""] + list(page.get("h1") or [])
@@ -201,6 +202,31 @@ def page_locale(page: dict) -> bool:
         if m and m.group(1).lower() not in {"france", "belgique", "suisse", "europe", "ligne"}:
             return True
     return False
+
+
+def page_locale(page: dict, corpus: list[dict] | None = None) -> bool:
+    """La page est-elle une page a vocation locale, au sens SEO du terme ?
+
+    Nommer un lieu ne suffit pas. Sur publi3.com, quatre ARTICLES DE REFERENCE
+    ("Geely avec Como sur Paris", "Club Med a Liege") passaient l'heuristique
+    et recoltaient un constat « page ville sans contact local », sur un site
+    qui n'a aucune page ville. Du bruit dans un livrable client.
+
+    Le discriminant est ailleurs : une vraie architecture ville x service est
+    une FAMILLE. Chaque page ville a des soeurs de meme gabarit, a un nom de
+    lieu pres. Un cas client isole n'en a aucune. On reutilise donc
+    `paire_geographique()` contre le corpus.
+
+    Sans corpus, on retombe sur la seule detection de lieu, moins sure : c'est
+    le comportement des appels unitaires et des tests.
+    """
+    if not _nomme_un_lieu(page):
+        return False
+    if corpus is None:
+        return True
+    titre = page.get("title") or ""
+    return any(paire_geographique(titre, autre.get("title") or "")
+               for autre in corpus if autre.get("url") != page.get("url"))
 
 
 def signaux_contact(texte: str) -> dict:
