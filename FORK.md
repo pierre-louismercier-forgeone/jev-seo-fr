@@ -120,6 +120,37 @@ Lighthouse, Core Web Vitals, robots.txt).
   le livrable tant que WeasyPrint n'est pas disponible. Le positionnement
   absolu de la couverture, concu pour le A4, est repasse en flux a l'ecran.
 
+### 9. Deux fournisseurs pour le meme contrat
+
+L'acces anticipe TypeSafe a ete remis en pause le 22 septembre 2026, donc une
+cle directe n'est pas garantie. **OpenRouter expose le meme contrat System One**
+a `POST https://openrouter.ai/api/v1/systemone`, en inscription libre, au meme
+prix (0,042 $ par million de jetons d'entree, sortie gratuite), avec TypeSafe
+comme unique fournisseur derriere (donc aucune variance de routage).
+
+Attention a ne pas confondre les deux surfaces OpenRouter :
+
+| Surface | Schema | Verdict |
+|---|---|---|
+| `/api/v1/systemone` | identique a TypeSafe, presente par leur doc comme un simple changement de base URL | **c'est celle qu'on utilise** |
+| `/api/alpha/decisions` | schema propre, endpoint alpha | non, surface instable pour un gain nul |
+
+Les deux repondent 401 a une cle invalide, donc les URL sont confirmees.
+
+Selection du fournisseur, par ordre de priorite :
+
+1. `JEVSEO_PROVIDER=typesafe|openrouter` s'il est defini (une valeur inconnue leve) ;
+2. sinon, la premiere cle trouvee, TypeSafe d'abord ;
+3. sinon, TypeSafe par defaut, et les jugements sont ignores.
+
+Le modele par defaut differe volontairement : `jev-latest` en direct, mais
+**`typesafe/jev-1.13`, version figee, via OpenRouter**. Un audit client doit
+rester reproductible : si le modele bouge sous nous, deux audits du meme site
+divergent sans qu'une seule ligne du site ait change. `JEVSEO_MODEL` surcharge.
+
+OpenRouter renvoie `usage.cost`, le cout reellement facture. Quand il est
+present, il fait foi dans le registre ; sinon on garde le calcul par jetons.
+
 ## La langue des questions reste un point ouvert
 
 La doc TypeSafe dit que **l'anglais est la langue la plus forte de Jev**, et le
@@ -141,15 +172,16 @@ variantes, comparer les taux d'accord. Cout estime : quelques centimes.
 
 ## Ce qui n'est pas encore fait
 
-- Aucun jugement Jev n'a jamais tourne : sans cle TypeSafe, la couche
+- Aucun jugement Jev n'a jamais tourne : en l'absence de cle, la couche
   jugement, les deux questions locales et les taxonomies de marche sont
-  validees par les tests, pas en conditions reelles.
+  validees par les tests, pas en conditions reelles. Le cablage des deux
+  fournisseurs est teste, l'aller-retour reel ne l'est pas encore.
 - Le PDF reste indisponible sur cette machine (Pango/GLib absents).
 - Les captures d'ecran de `docs/assets/` sont encore celles de l'upstream.
 
 ## Etat des tests
 
-`python -m unittest discover -s tests` : **43 tests, tous verts**, dont 5
+`python -m unittest discover -s tests` : **50 tests, tous verts**, dont 12
 nouveaux couvrant les correctifs francais. Les tests de rendu acceptent
 desormais `report.html` quand WeasyPrint est indisponible, et exigent toujours
 qu'un document soit produit.

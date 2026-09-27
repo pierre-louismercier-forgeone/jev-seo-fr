@@ -540,3 +540,77 @@ class FrancisationTests(unittest.TestCase):
         b = "A Reims, notre activite porte surtout sur les exploitations viticoles et le negoce de champagne. "
         self.assertLess(fr.similarite_texte(a * 6, b * 6), fr.SEUIL_PAGE_SATELLITE)
         self.assertIn("doorway_pages", checks.RULES)
+
+
+class FournisseurTests(unittest.TestCase):
+    """FR: selection du fournisseur System One (TypeSafe direct ou OpenRouter)."""
+
+    def setUp(self):
+        import importlib, os
+        self.os, self.importlib = os, importlib
+        self.saved = {k: os.environ.get(k) for k in
+                      ("JEVSEO_PROVIDER", "JEVSEO_MODEL", "TYPESAFE_API_KEY", "JEV_API_KEY", "OPENROUTER_API_KEY")}
+        for k in self.saved:
+            os.environ.pop(k, None)
+        # Isole du .env du depot et de ~/Desktop/Keys/.env : sans cela le test
+        # depend des cles reellement installees sur la machine.
+        self.tmp = Path(tempfile.mkdtemp())
+        (self.tmp / "vide.env").write_text("")
+        os.environ["JEVSEO_ENV_FILE"] = str(self.tmp / "vide.env")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.os.environ.pop("JEVSEO_ENV_FILE", None)
+        for k, v in self.saved.items():
+            if v is None:
+                self.os.environ.pop(k, None)
+            else:
+                self.os.environ[k] = v
+        self.importlib.reload(__import__("jevseo.jev", fromlist=["jev"]))
+
+    def reload(self):
+        from jevseo import jev
+        return self.importlib.reload(jev)
+
+    def test_defaut_typesafe_sans_cle(self):
+        j = self.reload()
+        self.assertEqual(j.PROVIDER, "typesafe")
+        self.assertEqual(j.API, "https://api.typesafe.ai/v1/systemone")
+
+    def test_cle_openrouter_seule_choisit_openrouter(self):
+        self.os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-test"
+        j = self.reload()
+        self.assertEqual(j.PROVIDER, "openrouter")
+        self.assertEqual(j.API, "https://openrouter.ai/api/v1/systemone")
+        # Version figee : un audit client doit rester reproductible.
+        self.assertEqual(j.MODEL, "typesafe/jev-1.13")
+        self.assertNotIn("alpha", j.API, "on ne passe pas par la surface alpha /decisions")
+
+    def test_typesafe_prioritaire_si_les_deux_cles(self):
+        self.os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-test"
+        self.os.environ["TYPESAFE_API_KEY"] = "ts-test"
+        self.assertEqual(self.reload().PROVIDER, "typesafe")
+
+    def test_forcage_explicite(self):
+        self.os.environ["TYPESAFE_API_KEY"] = "ts-test"
+        self.os.environ["JEVSEO_PROVIDER"] = "openrouter"
+        self.assertEqual(self.reload().PROVIDER, "openrouter")
+
+    def test_modele_surchargeable(self):
+        self.os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-test"
+        self.os.environ["JEVSEO_MODEL"] = "typesafe/jev-latest"
+        self.assertEqual(self.reload().MODEL, "typesafe/jev-latest")
+
+    def test_fournisseur_inconnu_leve(self):
+        self.os.environ["JEVSEO_PROVIDER"] = "nimportequoi"
+        with self.assertRaises(RuntimeError):
+            self.reload()
+
+    def test_cout_facture_prime_sur_l_estimation(self):
+        j = self.reload()
+        client = j.Jev(budget_usd=1.0, log=lambda *_: None)
+        client.ledger["input_tokens"] = 1_000_000          # estimation : 0,042 $
+        self.assertAlmostEqual(client.cost(), 0.042, places=6)
+        client.ledger["billed_usd"] = 0.0311                # cout renvoye par le fournisseur
+        self.assertAlmostEqual(client.cost(), 0.0311, places=6)

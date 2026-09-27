@@ -9,6 +9,7 @@ their probabilities; code turns them into findings only in the decisive band.
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 import time
@@ -20,10 +21,58 @@ from jevseo.env import secret
 
 from jevseo import fr
 
-API = "https://api.typesafe.ai/v1/systemone"
-MODELS_API = "https://api.typesafe.ai/v1/models"
-MODEL = "jev-latest"
-USD_PER_MTOK = 0.042  # docs.typesafe.ai/models, retrieved 2026-09-20; re-check with the Jev brain staleness rule
+# FR: deux fournisseurs possibles pour le meme contrat System One.
+#
+# TypeSafe en direct est la voie d'origine, mais son acces anticipe a ete remis
+# en pause le 22 septembre 2026, donc une cle n'est pas garantie. OpenRouter
+# expose le MEME contrat a /api/v1/systemone (leur doc le presente comme
+# "compatible avec les SDK TypeSafe, changez la base URL"), en inscription
+# libre et au meme prix. On ne passe pas par leur /api/alpha/decisions : c'est
+# une surface alpha au schema distinct, alors que systemone est un
+# remplacement direct.
+PROVIDERS = {
+    "typesafe": {
+        "api": "https://api.typesafe.ai/v1/systemone",
+        "models_api": "https://api.typesafe.ai/v1/models",
+        "model": "jev-latest",
+        "keys": ("TYPESAFE_API_KEY", "JEV_API_KEY"),
+        "headers": {},
+    },
+    "openrouter": {
+        "api": "https://openrouter.ai/api/v1/systemone",
+        "models_api": None,
+        # Version figee et non `jev-latest` : un audit client doit rester
+        # reproductible. Si le modele bouge sous nous, deux audits du meme site
+        # divergent sans qu'une seule ligne du site ait change.
+        "model": "typesafe/jev-1.13",
+        "keys": ("OPENROUTER_API_KEY",),
+        "headers": {"HTTP-Referer": "https://forgeone.fr", "X-Title": "ForgeOne jev-seo-fr"},
+    },
+}
+
+
+def provider_name() -> str:
+    """Fournisseur choisi : JEVSEO_PROVIDER, sinon la premiere cle trouvee."""
+    want = (os.environ.get("JEVSEO_PROVIDER") or "").strip().lower()
+    if want in PROVIDERS:
+        return want
+    if want:
+        raise RuntimeError(f"JEVSEO_PROVIDER inconnu : {want!r} (attendu : {', '.join(PROVIDERS)})")
+    for name, cfg in PROVIDERS.items():
+        if any(secret(k) for k in cfg["keys"]):
+            return name
+    return "typesafe"
+
+
+def provider_key(name: str) -> str | None:
+    return next((secret(k) for k in PROVIDERS[name]["keys"] if secret(k)), None)
+
+
+PROVIDER = provider_name()
+API = PROVIDERS[PROVIDER]["api"]
+MODELS_API = PROVIDERS[PROVIDER]["models_api"]
+MODEL = os.environ.get("JEVSEO_MODEL") or PROVIDERS[PROVIDER]["model"]
+USD_PER_MTOK = 0.042  # docs.typesafe.ai/models et openrouter.ai/typesafe/jev-1.13, releve le 2026-09-27
 PAGE_TEXT_CHARS = 6000
 ACT = 0.80  # Choice and Score confidence at or above this is decisive
 YES, NO = 0.80, 0.20  # Noul decisive bands (Noul has no confidence field)
@@ -338,17 +387,21 @@ def keyword_batches(keywords: list[dict], pages: list[dict], site_ctx: dict, siz
 # ---------------------------------------------------------------- client
 class Jev:
     def __init__(self, budget_usd: float = 0.25, log=print):
-        self.key = secret("TYPESAFE_API_KEY")
+        self.provider = PROVIDER
+        self.key = provider_key(PROVIDER)
         self.budget = budget_usd
         self.log = log
         self.lock = threading.Lock()
-        self.ledger = {"model_requested": MODEL, "model_returned": None, "requests": 0, "failed": 0, "input_tokens": 0, "output_tokens": 0, "est_reserved_tokens": 0, "skipped_budget": 0, "errors": []}
+        self.ledger = {"provider": PROVIDER, "model_requested": MODEL, "model_returned": None, "requests": 0, "failed": 0, "input_tokens": 0, "output_tokens": 0, "est_reserved_tokens": 0, "skipped_budget": 0, "errors": []}
 
     @property
     def available(self) -> bool:
         return bool(self.key)
 
     def cost(self) -> float:
+        billed = self.ledger.get("billed_usd")
+        if billed is not None:  # FR: cout facture par le fournisseur, quand il le renvoie
+            return round(billed, 6)
         return round(self.ledger["input_tokens"] / 1e6 * USD_PER_MTOK, 6)
 
     def ask(self, state: dict, questions: dict) -> dict | None:
@@ -363,7 +416,7 @@ class Jev:
         try:
             for attempt in range(5):
                 try:
-                    r = requests.post(API, data=body, headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"}, timeout=90)
+                    r = requests.post(API, data=body, headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json", **PROVIDERS[self.provider]["headers"]}, timeout=90)
                 except requests.RequestException as err:
                     if attempt < 4:
                         time.sleep(2**attempt)
@@ -386,6 +439,12 @@ class Jev:
                         self.ledger["usage_estimated"] = self.ledger.get("usage_estimated", 0) + 1
                     self.ledger["output_tokens"] += usage.get("output_tokens") or 0
                     self.ledger["model_returned"] = data.get("model")
+                    # FR: OpenRouter renvoie le cout reellement facture. Quand il
+                    # est la, il fait foi ; sinon on garde le calcul par jetons.
+                    if isinstance(usage.get("cost"), (int, float)):
+                        self.ledger["billed_usd"] = round(self.ledger.get("billed_usd", 0.0) + usage["cost"], 6)
+                    if data.get("provider"):
+                        self.ledger["provider_returned"] = data["provider"]
                 answers = data.get("answers") or {}
                 missing = set(questions) - set(answers)
                 if missing:
@@ -440,7 +499,7 @@ def judge(crawl: dict, pages: list[dict], budget_usd: float, log=print, dfs: dic
     jev = Jev(budget_usd, log)
     out = {"available": jev.available, "site": None, "pages": {}, "pairs": [], "ledger": jev.ledger, "questions": {}}
     if not jev.available:
-        log("TYPESAFE_API_KEY not found: Jev judgments skipped; semantic sections will be marked not assessed.")
+        log("Aucune cle Jev trouvee (" + " ou ".join(k for c in PROVIDERS.values() for k in c["keys"]) + ") : jugements Jev ignores, les sections semantiques seront marquees non evaluees.")
         return out
     home = next((p for p in pages if p["url"] == crawl["final_url"]), pages[0] if pages else None)
     if home is None:
