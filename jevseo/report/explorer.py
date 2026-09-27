@@ -79,6 +79,7 @@ def payload(d: dict) -> dict:
             "contact": (p.get("contact") or {}) if isinstance(p.get("contact"), dict) else {},
             "actions": par_url.get(p["url"], []),
             "jev": {k: v for k, v in a.items() if isinstance(v, dict) and "band" in v},
+            "anatomie": a.get("anatomie") or [],
         })
     pages.sort(key=lambda x: (x["chemin"] != "/", -(x["jev"].get("importance", {}).get("value") or 0)))
 
@@ -101,6 +102,9 @@ def payload(d: dict) -> dict:
         "plafonds": scores.get("caps") or [], "partiel": scores.get("partial") or [],
         "pages": pages, "actions": actions,
         "libelles": _libelles(),
+        "roles": {k: (v if isinstance(v, str) else v.get("what", "")) for k, v in fr.ROLES_PASSAGE.items()},
+        "roles_courts": {"reponse": "Réponse", "preuve": "Preuve", "decor": "Décor",
+                         "navigation": "Navigation", "unclear": "Indécidable"},
         "registre": {k: {"type": v.get("type")} for k, v in registre.items()},
         "bandes": {"act": jev.ACT, "yes": jev.YES, "no": jev.NO},
         "langue_questions": fr.LANGUE_QUESTIONS,

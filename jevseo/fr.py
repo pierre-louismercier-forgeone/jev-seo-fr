@@ -571,3 +571,106 @@ LIBELLES_COURTS = {
         "personnel_ou_portfolio": "Portfolio", "other": "Autre", "unclear": "Indécidable",
     },
 }
+
+
+# --------------------------------------------------- 9. anatomie de page
+#
+# Creator Lab decoupe un transcript et etiquette le role de chaque segment
+# (accroche, probleme, exemple, appel a l'action). L'equivalent SEO n'est pas
+# le meme : sur une page web, la question utile n'est pas « ou est l'accroche »
+# mais « OU EST LA REPONSE », et « que fait le reste du texte ».
+#
+# Ca transforme un constat en brief. Aujourd'hui `answer_first` dit « la page
+# enterre l'essentiel » sur 35 pages de publi3.com. L'anatomie dit a quel
+# endroit exact la reponse arrive, et ce qu'il y a a la place avant elle.
+
+# v2. La v1 avait neuf roles et 37 % de decisivite seulement, avec `reponse`
+# et `offre` a 0 % de decisions fermes : plusieurs options se distinguaient par
+# degre et non par nature, exactement le travers que l'evaluation upstream
+# documente (passer de cinq a trois options y avait fait bondir la decisivite
+# de 1/30 a 27/30). Quatre roles, sur un axe unique et disjoint : le passage
+# informe-t-il, prouve-t-il, decore-t-il, ou est-ce du chrome ?
+ROLES_PASSAGE = {
+    "reponse": {
+        "what": "Donne au visiteur l'information ou l'engagement qu'il est venu chercher : ce qui est fait, comment, pour qui, a quel prix, dans quel delai, ou la reponse a la question posee par la page",
+        "examples": "une description de prestation, un tarif, une methode, une reponse a une question",
+    },
+    "preuve": {
+        "what": "Etablit la capacite de CETTE organisation par un element verifiable la concernant : un chantier qu'elle a realise, un client qu'elle a servi, un resultat qu'elle a obtenu, une certification qu'elle detient, son anciennete",
+        "not_for": "un fait sur un tiers, une date d'evenement ou un nom propre qui ne dit rien de ce que l'organisation sait faire",
+    },
+    "decor": "Slogan, generalite, formule d'agence, mise en bouche ou paraphrase : du texte qui n'informe ni ne prouve",
+    "navigation": "Libelles de menu, fil d'Ariane, listes de liens, titres d'articles mis bout a bout, pied de page : du chrome, pas du contenu",
+}
+
+MAX_PASSAGES = 24  # borne le cout : une page longue n'explose pas la requete
+MIN_CAR_PASSAGE = 90  # en dessous, on agrege : un fragment isole n'est pas jugeable
+
+
+def passages(texte: str, plan: list | None = None) -> list[dict]:
+    """Decoupe le texte de page en passages jugeables, bornes en nombre.
+
+    On coupe d'abord sur les titres du plan quand on les retrouve dans le
+    texte, puisque ce sont les frontieres voulues par l'auteur. A defaut, on
+    groupe des phrases. Les fragments trop courts sont agreges au precedent.
+    """
+    import re as _re
+
+    t = (texte or "").strip()
+    if not t:
+        return []
+
+    bornes = [0]
+    for titre in (plan or []):
+        titre = (titre if isinstance(titre, str) else titre.get("text", "")) or ""
+        titre = titre.strip()
+        if len(titre) < 4:
+            continue
+        i = t.find(titre, bornes[-1])
+        if i > bornes[-1]:
+            bornes.append(i)
+    bornes.append(len(t))
+
+    bruts = [t[a:b].strip() for a, b in zip(bornes, bornes[1:]) if t[a:b].strip()]
+    if len(bruts) < 3:  # pas de plan exploitable : on retombe sur les phrases
+        phrases = [p.strip() for p in _re.split(r"(?<=[.!?])\s+", t) if p.strip()]
+        taille = max(1, -(-len(phrases) // MAX_PASSAGES))
+        bruts = [" ".join(phrases[i:i + taille]) for i in range(0, len(phrases), taille)]
+
+    # Agregation des fragments trop courts, puis bornage.
+    fusion = []
+    for b in bruts:
+        if fusion and len(b) < MIN_CAR_PASSAGE:
+            fusion[-1] += " " + b
+        else:
+            fusion.append(b)
+    if len(fusion) > MAX_PASSAGES:
+        pas = -(-len(fusion) // MAX_PASSAGES)
+        fusion = [" ".join(fusion[i:i + pas]) for i in range(0, len(fusion), pas)]
+
+    total = sum(len(x) for x in fusion) or 1
+    out, curseur = [], 0
+    for i, x in enumerate(fusion):
+        out.append({"id": f"p{i}", "texte": x[:900], "debut": round(curseur / total, 3),
+                    "part": round(len(x) / total, 3)})
+        curseur += len(x)
+    return out
+
+
+def questions_passages(liste: list[dict], choice) -> dict:
+    """Une question de role par passage, toutes dans la meme requete."""
+    return {
+        f"role_{p['id']}": choice(
+            f"What is the main job of the passage `page.passages.{p['id']}` inside this page? "
+            f"Use the rest of the page for context but label only that passage.",
+            ROLES_PASSAGE | {"unclear": "Texte insuffisant ou ambigu"})
+        for p in liste
+    }
+
+
+# Au-dela de cette part de la page, une reponse qui n'est pas encore arrivee
+# est consideree comme enterree.
+SEUIL_REPONSE_ENTERREE = 0.35
+# En dessous de cette part de passages porteurs (reponse, preuve, offre,
+# objection), la page est surtout du decor.
+SEUIL_PAGE_CREUSE = 0.30

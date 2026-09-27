@@ -44,6 +44,7 @@ def audit(args) -> Path:
 
     out = Path(args.out) if args.out else default_out(args.url)
     out.mkdir(parents=True, exist_ok=True)
+    jev.ANATOMIE = bool(getattr(args, "anatomy", False))
     started = datetime.now(timezone.utc)
     timings = {}
 
@@ -292,6 +293,7 @@ def main(argv=None) -> None:
         p.add_argument("--jev-pages", type=int, default=60, help="maximum pages sent to Jev")
         p.add_argument("--jev-budget", type=float, default=0.25, help="hard Jev spend cap in USD")
         p.add_argument("--no-jev", action="store_true")
+        p.add_argument("--anatomy", action="store_true", help="anatomie de page : etiquette le role de chaque passage (ou est la reponse, ou est le remplissage). Ajoute jusqu'a 24 questions par page.")
         p.add_argument("--psi-pages", type=int, default=3, help="pages measured with PageSpeed Insights")
         p.add_argument("--no-psi", action="store_true")
         p.add_argument("--full", action="store_true", help="add DataForSEO rankings, keywords, competitors, backlinks, SERPs and AI mentions (paid per call)")

@@ -830,3 +830,65 @@ class ExplorateurTests(unittest.TestCase):
         self.assertEqual(externes, [], f"dependances externes : {externes}")
         self.assertIn('"pages"', html)
         self.assertIn("file://", html, "les polices sont embarquees en local")
+
+
+class AnatomieTests(unittest.TestCase):
+    """FR: decoupage en passages et roles. La v1 a neuf roles plafonnait a 37 %
+    de decisivite avec `reponse` a 0 % : plusieurs options se distinguaient par
+    degre. La v2 en garde quatre, sur un axe disjoint."""
+
+    TEXTE = ("Nous remplacons votre serrure en moins de trente minutes sur Meaux et ses environs. "
+             "Le tarif est annonce avant l'intervention, sans supplement de nuit. " * 3 +
+             "Nous intervenons depuis 2009 et avons traite plus de 4 000 depannages dans le secteur. " * 2 +
+             "Accueil Nos services Contact Mentions legales Plan du site " * 3)
+
+    def test_decoupage_borne_et_positionne(self):
+        from jevseo import fr
+        ps = fr.passages(self.TEXTE)
+        self.assertTrue(ps)
+        self.assertLessEqual(len(ps), fr.MAX_PASSAGES)
+        self.assertAlmostEqual(ps[0]["debut"], 0.0, places=2)
+        self.assertAlmostEqual(sum(p["part"] for p in ps), 1.0, places=1)
+        for a, b in zip(ps, ps[1:]):
+            self.assertLess(a["debut"], b["debut"], "les positions sont croissantes")
+
+    def test_fragments_courts_agreges(self):
+        from jevseo import fr
+        for p in fr.passages("Oui. Non. Peut-etre. " * 40):
+            self.assertGreaterEqual(len(p["texte"]), 20)
+
+    def test_texte_vide(self):
+        from jevseo import fr
+        self.assertEqual(fr.passages(""), [])
+        self.assertEqual(fr.passages(None), [])
+
+    def test_quatre_roles_disjoints(self):
+        """La v1 en avait neuf, dont plusieurs se recouvraient par degre."""
+        from jevseo import fr
+        self.assertEqual(set(fr.ROLES_PASSAGE), {"reponse", "preuve", "decor", "navigation"})
+
+    def test_questions_une_par_passage_avec_option_indecidable(self):
+        from jevseo import fr, jev
+        ps = fr.passages(self.TEXTE)
+        qs = fr.questions_passages(ps, jev.choice)
+        self.assertEqual(len(qs), len(ps))
+        for q in qs.values():
+            self.assertEqual(q["type"], "choice")
+            self.assertIn("unclear", q["criteria"], "toute question fermee a une sortie de secours")
+
+    def test_anatomie_desactivee_par_defaut(self):
+        """Elle change le cout d'un run : elle ne s'active que sur demande."""
+        from jevseo import jev
+        self.assertFalse(jev.ANATOMIE)
+        p = {"url": "https://x.fr/a", "title": "T", "h1": ["H"], "text_excerpt": self.TEXTE, "word_count": 400}
+        self.assertEqual([k for k in jev.page_questions(p) if k.startswith("role_")], [])
+        self.assertEqual(jev.page_state(p, {})["page"]["passages"], {})
+
+    def test_anatomie_activee_ajoute_les_roles_et_les_passages(self):
+        from jevseo import jev
+        p = {"url": "https://x.fr/a", "title": "T", "h1": ["H"], "text_excerpt": self.TEXTE, "word_count": 400}
+        jev.ANATOMIE = True
+        self.addCleanup(setattr, jev, "ANATOMIE", False)
+        roles = [k for k in jev.page_questions(p) if k.startswith("role_")]
+        self.assertTrue(roles)
+        self.assertEqual(len(jev.page_state(p, {})["page"]["passages"]), len(roles))

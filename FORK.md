@@ -265,6 +265,63 @@ l'est. Le constat `jev_answer_first` est d'ailleurs emis, avec raison.
 Piste a creuser : les libelles de navigation qui bavent dans `text_excerpt`
 degradent le signal sur plusieurs questions.
 
+### 11. Explorateur interactif
+
+`explorer.html`, un fichier autonome sans dependance externe, genere depuis
+`audit.json` : aucun appel supplementaire, aucun cout. Les 12 jugements par
+page, leurs distributions completes, leur confiance et leur bande etaient deja
+stockes ; seul le rapport A4 les resumait.
+
+Trois vues : pages filtrables et triables, actions par impact, notes avec le
+registre Jev. Cliquer une page ouvre son dossier : chaque question, sa valeur,
+sa bande, sa confiance, la distribution complete avec le libelle de chaque
+niveau, les actions qui la touchent, son ouverture apres le H1, et le texte
+que Jev a reellement lu.
+
+Les colonnes portent un libelle court (`fr.LIBELLES_COURTS`), le detail garde
+la phrase de critere entiere : un critere est ecrit pour que Jev tranche, pas
+pour etre lu dans un tableau.
+
+### 12. Anatomie de page (`--anatomy`)
+
+Etiquette le role de chaque passage d'une page. La ou `jev_answer_first` dit
+seulement « la page enterre l'essentiel », l'anatomie dit **a quel endroit la
+reponse arrive** et ce qu'il y a a la place avant elle. C'est la difference
+entre un constat et un brief de reecriture.
+
+Desactivee par defaut : elle ajoute jusqu'a 24 questions par page, donc elle
+change le cout d'un run. Mesure sur publi3.com, 43 pages : **0,0108 $ sans,
+0,0172 $ avec**.
+
+Trois constats en sortent : `jev_reponse_enterree` (la reponse arrive apres
+35 % de la page), `jev_sans_reponse` (aucun passage ne repond),
+`jev_page_creuse` (moins de 30 % de passages porteurs).
+
+**La v1 ne marchait pas, et la mesure l'a dit.** Neuf roles, 37 % de
+decisivite seulement, `reponse` et `offre` a **0 %** de decisions fermes :
+plusieurs options se distinguaient par degre et non par nature, exactement le
+travers que l'evaluation upstream documente. La v2 garde quatre roles sur un
+axe disjoint (informe, prouve, decore, chrome) : 40 % de decisivite, confiance
+mediane de 0,53 a 0,67.
+
+**Ce qui restait n'etait pas la question, c'etait le texte.** Sur clw.fr, dont
+les pages sont de la prose, le meme jeu de questions donne :
+
+| | publi3.com (fil d'actualite) | clw.fr (pages de service) |
+|---|---:|---:|
+| Decisivite | 40 % | **54 %** |
+| Confiance mediane | 0,67 | **0,84** |
+| Passages `navigation` | 51 % | **10 %** |
+| `reponse` decisif | 17 % | **65 %** |
+
+L'instrument fonctionne. Le texte extrait de publi3.com est a moitie du chrome
+(libelles de menu, titres d'articles mis bout a bout) et n'est pas segmentable
+en passages a role unique. Une indecision de 40 % y est la bonne reponse.
+
+Limite connue : le role `decor` reste faiblement decisif (10 %) sur les deux
+sites. C'est le residu, celui qui attrape ce que les trois autres n'ont pas
+pris ; il est a lire comme un signal, pas comme un verdict.
+
 ## Ce qui n'est pas encore fait
 
 - Un seul site teste, et il est bien construit. La regle `doorway_pages` n'a

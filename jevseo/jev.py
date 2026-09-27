@@ -74,6 +74,10 @@ MODELS_API = PROVIDERS[PROVIDER]["models_api"]
 MODEL = os.environ.get("JEVSEO_MODEL") or PROVIDERS[PROVIDER]["model"]
 USD_PER_MTOK = 0.042  # docs.typesafe.ai/models et openrouter.ai/typesafe/jev-1.13, releve le 2026-09-27
 PAGE_TEXT_CHARS = 6000
+# FR: anatomie de page, desactivee par defaut. Elle ajoute une question de role
+# par passage (jusqu'a 24), ce qui change le cout d'un run : on ne modifie pas
+# la depense d'un audit existant sans que l'operateur l'ait demande.
+ANATOMIE = False
 # Statuts reessayables : surcharge et indisponibilite cote fournisseur, plus
 # les erreurs de edge Cloudflare propres au passage par OpenRouter.
 RETRY_STATUS = frozenset({429, 500, 502, 503, 529, 520, 521, 522, 523, 524})
@@ -200,6 +204,8 @@ def page_questions(p: dict, corpus: list[dict] | None = None) -> dict:
     # joue le risque de page satellite.
     if fr.page_locale(p, corpus):
         q.update(fr.questions_locales(p, choice, noul, score))
+    if ANATOMIE:
+        q.update(fr.questions_passages(fr.passages((p.get("text_excerpt") or "")[:PAGE_TEXT_CHARS], p.get("outline")), choice))
     if p.get("title"):
         q["title_fit"] = score(
             "How accurately and attractively does `page.title` describe what `page` actually contains?",
@@ -264,6 +270,7 @@ def page_state(p: dict, site_ctx: dict) -> dict:
             # FR: extraites de la page ENTIERE, car les coordonnees vivent dans
             # le pied de page, au-dela du plafond de 6 000 caracteres.
             "contact": fr.signaux_contact(text),
+            "passages": {x["id"]: x["texte"] for x in fr.passages(text[:PAGE_TEXT_CHARS], p.get("outline"))} if ANATOMIE else {},
             "text": text[:PAGE_TEXT_CHARS],
             "text_truncated": len(text) > PAGE_TEXT_CHARS,
         },
@@ -541,6 +548,20 @@ def judge(crawl: dict, pages: list[dict], budget_usd: float, log=print, dfs: dic
         ans = jev.ask(page_state(p, site_ctx), qs)
         if ans is not None and is_home:
             ans["page_type"] = {"type": "choice", "value": "homepage", "probabilities": {"homepage": 1.0}, "confidence": 1.0, "band": "act", "source": "code"}
+        if ans is not None and ANATOMIE:
+            # FR: les reponses de role sortent du dictionnaire des jugements de
+            # page et deviennent une sequence ordonnee, avec la position de
+            # chaque passage dans la page. C'est la position qui porte le sens :
+            # savoir qu'il y a une reponse ne vaut rien si elle arrive a 80 %.
+            seq = fr.passages((p.get("text_excerpt") or "")[:PAGE_TEXT_CHARS], p.get("outline"))
+            anat = []
+            for x in seq:
+                a = ans.pop(f"role_{x['id']}", None)
+                if a:
+                    anat.append({**x, "role": a["value"], "confidence": a.get("confidence"),
+                                 "band": a["band"], "probabilities": a.get("probabilities", {})})
+            if anat:
+                ans["anatomie"] = anat
         return p["url"], ans
 
     step = max(1, -(-len(pages) // 5))  # about five progress lines per run

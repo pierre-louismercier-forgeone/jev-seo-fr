@@ -94,6 +94,21 @@ dialog::backdrop{background:rgba(10,14,23,.34)}
 .fait b{font-family:"JetBrains Mono",monospace;font-weight:500;text-align:right}
 .extrait{margin-top:12px;font-size:12.5px;color:var(--ink2);white-space:pre-wrap;max-height:260px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:7px;padding:10px}
 
+.anat{display:flex;height:22px;border-radius:5px;overflow:hidden;border:1px solid var(--line);margin:6px 0 4px}
+.anat i{display:block;height:100%;cursor:pointer}
+.anat i.reponse{background:var(--bleu)}
+.anat i.preuve{background:#4A8AE6}
+.anat i.decor{background:#CBDEFA}
+.anat i.navigation{background:var(--line)}
+.anat i.unclear{background:#F0E3C0}
+.anat i.rev{opacity:.5}
+.leg{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:10px}
+.leg span{display:flex;align-items:center;gap:5px}
+.leg b{width:10px;height:10px;border-radius:2px;display:inline-block}
+.pass{border-top:1px solid var(--line);padding:8px 0;font-size:12.5px}
+.pass .ph{display:flex;gap:8px;align-items:baseline;margin-bottom:3px}
+.pass .ph .pos{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--muted)}
+.pass .tx{color:var(--ink2)}
 .acts{display:flex;flex-direction:column;gap:0}
 .act{border-bottom:1px solid var(--line);padding:13px 0}
 .act .t{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
@@ -139,6 +154,10 @@ const COLS = [
   {k:"trust", t:"Confiance", jev:1, num:1},
   {k:"citable", t:"Citab.", jev:1, num:1},
   {k:"mots", t:"Mots", num:1},
+  {k:"_rep", t:"Réponse à", num:1, calc:p=>{
+     if(!p.anatomie.length) return null;
+     const r=p.anatomie.find(x=>x.role==="reponse");
+     return r? r.debut : 1.01;}},
 ];
 
 let F = {q:"", page_type:new Set(), intent:new Set(), action:new Set(), rev:false, act:false};
@@ -183,6 +202,10 @@ function rail(){
 function raz(){F={q:"",page_type:new Set(),intent:new Set(),action:new Set(),rev:false,act:false}; rendu();}
 
 function cellule(p,c){
+  if(c.calc){const v=c.calc(p);
+    if(v==null) return `<span style="color:var(--muted)">—</span>`;
+    if(v>1) return `<span style="color:var(--critique)">aucune</span>`;
+    return `<span class="mono" style="${v>=0.35?"color:var(--eleve)":""}">${Math.round(v*100)}%</span>`;}
   if(!c.jev) return c.k==="chemin" ? esc(p.chemin) : (p[c.k]??"");
   const a=p.jev[c.k];
   if(!a) return `<span style="color:var(--muted)">—</span>`;
@@ -195,7 +218,8 @@ function cellule(p,c){
 function vuePages(){
   const rows=filtrees();
   rows.sort((x,y)=>{
-    const a=tri.k in x?x[tri.k]:val(x,tri.k), b=tri.k in y?y[tri.k]:val(y,tri.k);
+    const cc=COLS.find(c=>c.k===tri.k && c.calc);
+    const a=cc?cc.calc(x):(tri.k in x?x[tri.k]:val(x,tri.k)), b=cc?cc.calc(y):(tri.k in y?y[tri.k]:val(y,tri.k));
     if(a==null) return 1; if(b==null) return -1;
     return (a<b?-1:a>b?1:0)*(tri.desc?-1:1);
   });
@@ -251,6 +275,13 @@ function detail(url){
   const p=D.pages.find(x=>x.url===url); if(!p) return;
   sel=url;
   let g=`<h2>${esc(p.titre||p.chemin)}</h2><div class="u"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.url)}</a></div>`;
+  if(p.anatomie.length){
+    const r=p.anatomie.find(x=>x.role==="reponse");
+    g+=`<div class="anat">`+p.anatomie.map((x,i)=>
+      `<i class="${x.role} ${x.band==="review"?"rev":""}" style="width:${(x.part*100).toFixed(2)}%" data-p="${i}" title="${esc(D.roles_courts[x.role]||x.role)} · ${esc(x.texte.slice(0,110))}"></i>`).join("")+`</div>
+      <div class="leg">`+["reponse","preuve","decor","navigation"].map(k=>`<span><b class="${k}" style="background:${k==="reponse"?"var(--bleu)":k==="preuve"?"#4A8AE6":k==="decor"?"#CBDEFA":"var(--line)"}"></b>${D.roles_courts[k]}</span>`).join("")
+      +`<span style="margin-left:auto">${r?`réponse à ${Math.round(r.debut*100)} % de la page`:"aucun passage ne répond"} · une barre pâlie est une étiquette à vérifier</span></div>`;
+  }
   const ordre=["page_type","intent","action","importance","helpfulness","specificity","trust","citable","preuve_locale","contact_local","answer_first","clear_next_step","title_fit","meta_fit","h1_fit"];
   const qs=ordre.filter(k=>p.jev[k]);
   if(!qs.length) g+=`<div class="vide">Cette page n'a pas été jugée par Jev.</div>`;
@@ -287,6 +318,8 @@ function detail(url){
   if(p.contact && (p.contact.telephones||[]).length) d+=`<div class="fait"><span>Téléphone vu</span><b>${esc(p.contact.telephones[0])}</b></div>`;
   if(p.actions.length) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Actions sur cette page</h3>`+
     p.actions.map(id=>{const a=D.actions.find(x=>x.id===id);return `<div class="fait"><span class="mono" style="color:var(--bleu)">${id}</span><b style="text-align:right;font-weight:400">${esc(a?a.titre:"")}</b></div>`;}).join("");
+  if(p.anatomie.length) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Anatomie · ${p.anatomie.length} passages</h3>`+
+    p.anatomie.map((x,i)=>`<div class="pass"><div class="ph"><span class="pos">${Math.round(x.debut*100)}%</span><span class="chip ${x.band==="review"?"rev":"jev"}">${esc(D.roles_courts[x.role]||x.role)}</span><span class="pos" style="margin-left:auto">${x.confidence!=null?x.confidence.toFixed(2):""}</span></div><div class="tx">${esc(x.texte.slice(0,220))}${x.texte.length>220?"…":""}</div></div>`).join("");
   if(p.ouverture) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Ouverture, après le H1</h3><div class="extrait" style="max-height:120px">${esc(p.ouverture)}</div>`;
   if(p.extrait) d+=`<h3 style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px">Texte lu par Jev</h3><div class="extrait">${esc(p.extrait)}${p.extrait_tronque?"\n\n[…] extrait tronqué":""}</div>`;
   $("#det").innerHTML=`<div class="g">${g}</div><div class="d">${d}</div>`;

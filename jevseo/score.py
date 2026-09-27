@@ -8,6 +8,7 @@ from __future__ import annotations
 from statistics import mean
 from urllib.parse import urlparse
 
+from jevseo import fr
 from jevseo.checks import CATEGORIES, SEVERITY_WEIGHT, SRC, html_pages
 
 DEDUCT = {"critical": 25, "high": 12, "medium": 6, "low": 2, "info": 0}
@@ -35,11 +36,17 @@ JEV_RULES = {
     # exactement ce que Google qualifie de page satellite.
     "jev_preuve_locale": ("content", "high", "Pages ville sans preuve d'activite sur place", "Ajoutez du concret local et verifiable : chantiers ou dossiers traites dans cette ville, quartiers desservis, delais d'intervention reels, avis de clients de la ville, equipe qui couvre le secteur. Le nom de la ville dans un texte generique ne suffit pas.", "doorway", 3),
     "jev_coordonnees_locales": ("content", "medium", "Pages ville dont le seul contact est le siege", "Donnez a chaque page ville un contact rattache a ce lieu : ligne locale, adresse de l'antenne, ou a defaut une mention explicite de la zone couverte depuis le siege. Un numero de siege sans rattachement local affaiblit le signal de proximite.", "starter", 1),
+    # FR: constats issus de l'anatomie de page. La ou `jev_answer_first` dit
+    # seulement « la page enterre l'essentiel », ceux-ci disent a quel endroit
+    # la reponse arrive et ce qu'il y a a la place avant elle.
+    "jev_reponse_enterree": ("content", "high", "Pages ou la reponse arrive trop tard", "Remontez en tete de page le passage qui repond reellement, puis gardez le contexte et les preuves apres. Un lecteur comme un moteur de reponse doivent obtenir l'essentiel avant de faire defiler.", "helpful", 2),
+    "jev_sans_reponse": ("content", "high", "Pages ou aucun passage ne repond", "Ecrivez le passage qui manque : la reponse concrete a ce que la page promet. En l'etat, le texte tourne autour du sujet sans le traiter.", "helpful", 3),
+    "jev_page_creuse": ("content", "medium", "Pages surtout composees de decor", "Remplacez le remplissage et les listes de liens par du contenu porteur : reponse, preuve verifiable, description d'offre, traitement d'objection.", "helpful", 3),
     "jev_cannibalization": ("content", "medium", "Pages qui se disputent les memes recherches", "Tranchez : une page par besoin de recherche. Fusionnez, differenciez, ou canonicalisez la plus faible.", "canonical", 2),
 }
 LOW = 0.45  # normalised Score below this becomes a finding
 # Jev findings whose advice is editorial rather than a documented search engine requirement
-HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step", "jev_preuve_locale", "jev_coordonnees_locales"}
+HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step", "jev_preuve_locale", "jev_coordonnees_locales", "jev_reponse_enterree", "jev_sans_reponse", "jev_page_creuse"}
 REACHABLE_KD = 30  # DataForSEO keyword difficulty treated as winnable without major authority (heuristic)
 DFS_RULES = {
     "dfs_striking": ("visibility", "medium", "Mots cles pertinents aux portes de la premiere page", "Renforcez la page positionnee sur chaque mot cle : repondez plus completement a la recherche, ajoutez-lui des liens internes et resserrez son title.", "dfs_labs", 2),
@@ -111,6 +118,34 @@ def jev_findings(crawl: dict, judged: dict) -> list[dict]:
                 review += a["band"] == "review"
                 ev.append(a["value"])
         return urls, review, ev
+
+    # FR: anatomie. Trois lectures d'une meme sequence de roles.
+    PORTEURS = {"reponse", "preuve"}  # v2 : deux roles porteurs, decor et navigation ne portent rien
+    enterrees, sans, creuses = [], [], []
+    for url, ans in pages.items():
+        anat = (ans or {}).get("anatomie")
+        if not anat or (ans["importance"]["value"] if "importance" in ans else 1) < 0.34:
+            continue
+        rep = next((x for x in anat if x["role"] == "reponse"), None)
+        if rep is None:
+            sans.append((url, anat))
+        elif rep["debut"] >= fr.SEUIL_REPONSE_ENTERREE:
+            enterrees.append((url, rep["debut"]))
+        part = sum(x["part"] for x in anat if x["role"] in PORTEURS)
+        if part < fr.SEUIL_PAGE_CREUSE:
+            creuses.append((url, part))
+    if enterrees:
+        enterrees.sort(key=lambda t: -t[1])
+        out.append(jev_finding("jev_reponse_enterree", [u for u, _ in enterrees],
+                               "; ".join(f"{urlparse(u).path or '/'} : la reponse arrive a {d:.0%} de la page" for u, d in enterrees[:6]),
+                               0, detail={"pages": [{"url": u, "debut": d} for u, d in enterrees]}))
+    if sans:
+        out.append(jev_finding("jev_sans_reponse", [u for u, _ in sans],
+                               "; ".join(f"{urlparse(u).path or '/'} : que du " + ", ".join(sorted({x['role'] for x in a})) for u, a in sans[:5]), 0))
+    if creuses:
+        creuses.sort(key=lambda t: t[1])
+        out.append(jev_finding("jev_page_creuse", [u for u, _ in creuses],
+                               "; ".join(f"{urlparse(u).path or '/'} : {p:.0%} de passages porteurs" for u, p in creuses[:6]), 0))
 
     important = lambda ans: ans["importance"]["value"] >= 0.5  # noqa: E731
     commercial = lambda ans: ans["page_type"]["value"] in ("homepage", "product_or_service", "pricing") or ans["intent"]["value"] in ("commercial", "transactional", "local")  # noqa: E731
