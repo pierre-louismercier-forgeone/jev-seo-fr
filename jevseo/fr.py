@@ -13,6 +13,8 @@ Trois familles de contenu :
 """
 from __future__ import annotations
 
+import re
+
 # ---------------------------------------------------------------- 1. langue
 
 # Upstream: checks.py GENERIC_ANCHORS, anglais uniquement. Sur un site
@@ -674,3 +676,189 @@ SEUIL_REPONSE_ENTERREE = 0.35
 # En dessous de cette part de passages porteurs (reponse, preuve, offre,
 # objection), la page est surtout du decor.
 SEUIL_PAGE_CREUSE = 0.30
+
+# ------------------------------------------------- 10. maillage interne
+#
+# Mesure du 1er octobre 2026, sur un site client de 30 pages : 44 des 46 cibles
+# internes sont liees depuis 100 % des pages. Autrement dit, le graphe de liens
+# interne EST le menu. Le `inlinks: 29` que remonte le crawler ne mesure rien :
+# c'est la navigation, comptee trente fois.
+#
+# Consequence de design. Un lien ne porte de signal thematique que s'il n'est
+# pas sur toutes les pages. Avant de proposer un lien, il faut donc separer le
+# gabarit du contextuel, sinon :
+#   - toute page parait deja liee et la preselection ne renvoie rien (teste) ;
+#   - on ne voit pas le vrai constat, qui est l'absence totale de maillage
+#     editorial derriere un menu tres fourni.
+#
+# Le crawl ne stocke que (url, ancre) par lien, sans position dans le DOM. On ne
+# peut donc pas lire « ce lien est dans le <nav> ». Mais on n'en a pas besoin :
+# une cible liee depuis presque toutes les pages est du gabarit, quelle que soit
+# la balise qui la porte. La detection est statistique, pas structurelle, et
+# elle tient sur les donnees deja collectees.
+
+SEUIL_SITEWIDE = 0.85     # part des pages au-dela de laquelle une cible est dans le menu ou le pied
+SEUIL_RECURRENT = 0.50    # ... au-dela de laquelle elle est dans un bloc recurrent (sidebar, « derniers articles »)
+CIBLES_MAILLAGE = 8       # cibles soumises a Jev par page source
+SEUIL_LIEN = 0.60         # P(oui) a partir duquel le lien est propose (voir la mesure ci-dessous)
+
+# Pourquoi deux seuils, et pourquoi 0,50. Distribution mesuree le 1er octobre
+# 2026 sur un site de 52 pages, part des pages qui lient chaque cible :
+#     98 98 98 98 98 88 | 79 79 79 62 | 31 17 17 15 15 15 13 13 ...
+# Trois plateaux et un trou franc entre 62 % et 31 %. Le premier plateau est le
+# menu, le deuxieme un bloc « dernieres actualites » repete dans la sidebar, le
+# troisieme les vrais liens de contenu. Couper a 0,50 tombe dans le trou ; c'est
+# la donnee qui place le seuil, pas une convention. Le seuil strict a 0,85 ne
+# sert qu'a raconter le menu separement du bloc recurrent dans le rapport.
+#
+# Pourquoi 0,60 et pas la bande generique du noul (0,80). Mesure du 1er octobre
+# 2026, deux sites de formes differentes, chaque paire jugee trois fois :
+#
+#   stabilite, identique sur les deux sites : amplitude de P(oui) entre passages
+#   de 0,02 en mediane et 0,05 au pire, 100 % des paires bougeant de moins de
+#   0,05. La valeur est un signal, pas du bruit. C'est le resultat qui porte tout
+#   le reste.
+#
+#   plage compressee, sur les deux sites : le P(oui) maximum observe est 0,77 et
+#   0,67. La bande generique a 0,80 ne se declenche JAMAIS et jetait tous les
+#   liens reels. Elle est calibree pour des questions ou le modele peut etre
+#   quasi certain (« l'accueil dit-il qui, quoi, ou »). « Ce lien aide-t-il ce
+#   lecteur » est un jugement editorial : il ne monte pas a 0,80, mais il trie.
+#
+#   forme de la distribution, differente selon le site. Site A (24 pages ville
+#   + 6 pages service) : ... 0,48 0,49 | 0,70 0,77, un trou de 0,21 quand le plus
+#   grand autre ecart est de 0,03. Site B (site de contenu, 52 pages) : continue,
+#   plus grand trou 0,07. Il n'y a donc PAS de trou universel ou poser le seuil,
+#   et il faut le dire : sur le site B, 0,60 tombe dans un continuum.
+#
+# D'ou la regle retenue : on filtre sur la valeur et non sur la bande, a 0,60,
+# et on marque `limite` toute proposition a moins de MARGE_LIEN du seuil, parce
+# qu'a cette distance le verdict peut basculer d'un passage a l'autre. Mesure :
+# a 0,60, le verdict est identique aux trois passages pour 100 % des paires du
+# site A et 98 % de celles du site B, cette seule paire discordante etant
+# exactement celle qui frole le seuil.
+
+MARGE_LIEN = 0.05         # amplitude max mesuree entre passages : en dessous, le verdict peut basculer
+
+# Mesure du 30 septembre 2026 : une question `choice` a 8 cibles donne 55 % de
+# reponses decisives, la meme a 29 cibles en donne ZERO. Les playbooks qui
+# circulent recommandent jusqu'a 255 options ; applique tel quel avec le seuil
+# standard, ca rejette tout. Nuance mesuree le meme jour : a 29 options le CHOIX
+# reste identique 15 fois sur 15, avec 0,45 d'ecart avec la deuxieme option. La
+# reponse est bonne, c'est la confiance qui decroche. D'ou deux decisions : on
+# reste a 8 cibles, et on pose une question BINAIRE par paire plutot qu'un choix
+# unique, parce qu'une page doit pouvoir en lier plusieurs, pas exactement une.
+
+# Types de page qui n'ont vocation ni a recevoir ni a emettre du lien editorial.
+SANS_MAILLAGE = {"legal_or_policy", "contact_or_location"}
+
+
+def graphe_maillage(pages, seuil=SEUIL_RECURRENT):
+    """Separe le gabarit du contextuel dans le graphe de liens interne.
+
+    Renvoie un dict :
+      gabarit            cibles liees depuis >= `seuil` des pages (menu, pied, blocs repetes)
+      sitewide           sous-ensemble strict : cibles liees depuis >= SEUIL_SITEWIDE des pages
+      sources_par_cible  {url cible: nb de pages qui la lient}
+      contextuels        {url source: [cibles hors gabarit]}
+      entrants_ctx       {url cible: nb de pages qui la lient hors gabarit}
+      part_gabarit       part des liens internes qui sont du gabarit
+      n_sources          nb de pages sources retenues
+
+    `part_gabarit` est le chiffre a mettre dans un rapport : il dit quelle
+    fraction du maillage ne transporte aucune information thematique.
+    """
+    sources = [p for p in pages if p.get("kind") == "page" and p.get("status") == 200]
+    n = len(sources)
+    vide = {"gabarit": set(), "sitewide": set(), "sources_par_cible": {}, "contextuels": {},
+            "entrants_ctx": {}, "part_gabarit": 0.0, "n_sources": 0}
+    if not n:
+        return vide
+    connues = {p["url"] for p in sources}
+    par_cible, liens_par_source = {}, {}
+    for p in sources:
+        cibles = {l["url"] for l in (p.get("links_internal") or []) if l.get("url") in connues and l["url"] != p["url"]}
+        liens_par_source[p["url"]] = cibles
+        for u in cibles:
+            par_cible[u] = par_cible.get(u, 0) + 1
+    # Le denominateur est n-1, pas n : une page ne se lie pas elle-meme, donc une
+    # entree de menu plafonne mecaniquement a (n-1)/n. Avec n au denominateur,
+    # un menu parfaitement site-wide passait sous le seuil des que le site est
+    # petit (n = 6 donne 0,83, sous les 0,85) et le gabarit devenait invisible.
+    d = max(n - 1, 1)
+    gabarit = {u for u, c in par_cible.items() if c / d >= seuil}
+    sitewide = {u for u, c in par_cible.items() if c / d >= SEUIL_SITEWIDE}
+    contextuels = {src: sorted(c - gabarit) for src, c in liens_par_source.items()}
+    entrants = {}
+    for cibles in contextuels.values():
+        for u in cibles:
+            entrants[u] = entrants.get(u, 0) + 1
+    total = sum(len(c) for c in liens_par_source.values())
+    boiler = sum(len(c & gabarit) for c in liens_par_source.values())
+    return {"gabarit": gabarit, "sitewide": sitewide, "sources_par_cible": par_cible,
+            "contextuels": contextuels, "entrants_ctx": entrants,
+            "part_gabarit": round(boiler / total, 3) if total else 0.0, "n_sources": n}
+
+
+def _sac_de_mots(page):
+    """Vocabulaire porteur d'une page : titre, H1 et plan."""
+    parts = [page.get("title") or "", " ".join(page.get("h1") or [])]
+    parts += [str(h) for h in (page.get("outline") or [])[:12]]
+    mots = re.findall(r"[\wÀ-ÿ'’-]{3,}", " ".join(parts).lower())
+    return {m for m in mots if m not in MOTS_VIDES and not m.isdigit()}
+
+
+def cibles_maillage(source, pages, graphe, juges=None, n=CIBLES_MAILLAGE):
+    """Presélectionne les meilleures cibles de lien pour une page source.
+
+    Trois criteres, dans cet ordre :
+      1. proximite de vocabulaire (Jaccard sur titre, H1 et plan) ;
+      2. bonus aux pages pauvres en liens entrants CONTEXTUELS, celles que le
+         maillage doit nourrir. Le compte brut d'entrants ne sert a rien ici :
+         il est sature par le menu ;
+      3. exclusion de la source, des cibles qu'elle lie deja contextuellement,
+         et des pages utilitaires.
+
+    Ce qui est VOLONTAIREMENT conserve : les cibles deja dans le menu. Etre au
+    menu n'est pas etre recommande en contexte ; c'est meme le cas le plus
+    frequent d'un lien editorial manquant.
+    """
+    src_mots = _sac_de_mots(source)
+    if len(src_mots) < 3:
+        return []
+    deja = set(graphe["contextuels"].get(source["url"], []))
+    entrants = graphe["entrants_ctx"]
+    maxi = max(entrants.values()) if entrants else 0
+    notes = []
+    for c in pages:
+        if c["url"] == source["url"] or c["url"] in deja:
+            continue
+        if c.get("kind") != "page" or c.get("status") != 200:
+            continue
+        if juges:
+            t = ((juges.get(c["url"]) or {}).get("page_type") or {}).get("value")
+            if t in SANS_MAILLAGE:
+                continue
+        m = _sac_de_mots(c)
+        if len(m) < 3:
+            continue
+        j = len(src_mots & m) / len(src_mots | m)
+        if j < 0.05:
+            continue
+        besoin = 1 - (entrants.get(c["url"], 0) / maxi if maxi else 0)
+        notes.append((round(0.65 * j + 0.35 * besoin, 4), round(j, 3), entrants.get(c["url"], 0), c))
+    notes.sort(key=lambda t: -t[0])
+    return [{"page": c, "proximite": j, "entrants_ctx": e, "note": s} for s, j, e, c in notes[:n]]
+
+
+def questions_maillage(liste, noul):
+    """Une question binaire par cible. Toutes dans la meme requete."""
+    return {
+        "lien_%d" % i: noul(
+            "Would a reader of `page` have an honest reason to follow a link to `cibles.c%d` at this point in their task? "
+            "Judge whether the link helps that reader move forward, not whether the two pages are similar." % i,
+            "The target answers a question the source raises, continues the reader's task, or supplies the proof or next step they need",
+            "The two pages merely share vocabulary, or the target repeats what the source already says, or the link would only serve internal ranking",
+        )
+        for i in range(len(liste))
+    }

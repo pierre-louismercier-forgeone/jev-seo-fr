@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from jevseo import checks, jev, score  # noqa: E402
+from jevseo import checks, fr, jev, score  # noqa: E402
 from jevseo.parse import normalize_url, parse_page  # noqa: E402
 
 def assert_document(case, out):
@@ -477,6 +477,91 @@ class RenderTests(unittest.TestCase):
     def test_narrative_used(self):
         tmp, out = self.build({"executive_summary": ["Custom verdict about JEV-001."], "strengths": ["s"], "risks": ["r"], "plan": [{"horizon": "This week", "items": ["JEV-001"]}]})
         self.assertIn("Custom verdict about JEV-001.", out["md"].read_text())
+
+
+class MaillageInterne(unittest.TestCase):
+    """La passe maillage. Le graphe brut ne mesure rien tant que le gabarit
+    (menu, pied, blocs repetes) n'en est pas retire : sur un site mesure, 100 %
+    des liens internes etaient la navigation et chaque page affichait 29 liens
+    entrants."""
+
+    @staticmethod
+    def page(url, titre, liens=(), mots=400):
+        # On part du gabarit de page des autres tests pour disposer de tous les
+        # champs que run_checks attend, puis on ne remplace que ce qui compte ici.
+        return dict(page(url, title=titre, word_count=mots),
+                    h1=[titre], outline=[], text_excerpt=titre * 3,
+                    links_internal=[{"url": u, "anchor": "x"} for u in liens])
+
+    def test_separe_le_menu_du_contenu(self):
+        urls = [f"https://x.fr/p{i}" for i in range(6)]
+        menu = urls[:2]
+        pages = [self.page(u, f"Page {i}", liens=menu + ([urls[5]] if i == 3 else [])) for i, u in enumerate(urls)]
+        g = fr.graphe_maillage(pages)
+        self.assertEqual(g["n_sources"], 6)
+        self.assertEqual(set(g["sitewide"]), {urls[0], urls[1]})
+        self.assertEqual(g["contextuels"][urls[3]], [urls[5]])   # seul lien hors gabarit
+        self.assertEqual(g["entrants_ctx"], {urls[5]: 1})
+        self.assertTrue(0 < g["part_gabarit"] < 1)
+
+    def test_site_sans_maillage_editorial(self):
+        """Cas mesure sur un vrai site : tout le graphe est la navigation."""
+        urls = [f"https://x.fr/p{i}" for i in range(5)]
+        pages = [self.page(u, f"Page {i}", liens=[v for v in urls if v != u]) for i, u in enumerate(urls)]
+        g = fr.graphe_maillage(pages)
+        self.assertEqual(g["part_gabarit"], 1.0)
+        self.assertFalse(any(g["contextuels"].values()))
+        self.assertEqual(g["entrants_ctx"], {})
+
+    def test_cible_deja_liee_ecartee_mais_pas_celle_du_menu(self):
+        """Etre au menu n'est pas etre recommande en contexte."""
+        a = self.page("https://x.fr/a", "Recouvrement amiable de creances impayees")
+        b = self.page("https://x.fr/b", "Recouvrement judiciaire de creances impayees")
+        c = self.page("https://x.fr/c", "Recouvrement amiable de creances impayees express")
+        graphe = {"contextuels": {"https://x.fr/a": ["https://x.fr/c"]}, "entrants_ctx": {"https://x.fr/c": 1}}
+        cibles = [x["page"]["url"] for x in fr.cibles_maillage(a, [a, b, c], graphe)]
+        self.assertEqual(cibles, ["https://x.fr/b"])
+
+    def test_pages_utilitaires_ecartees(self):
+        a = self.page("https://x.fr/a", "Recouvrement amiable de creances")
+        b = self.page("https://x.fr/b", "Recouvrement de creances mentions legales")
+        juges = {"https://x.fr/b": {"page_type": {"value": "legal_or_policy"}}}
+        self.assertEqual(fr.cibles_maillage(a, [a, b], {"contextuels": {}, "entrants_ctx": {}}, juges), [])
+
+    def test_pages_minces_ecartees_des_sources(self):
+        """Une page mince n'a rien d'ou lier : le lien y serait decoratif."""
+        grasse = self.page("https://x.fr/a", "Page complete", mots=fr.SEUIL_CONTENU_MINCE + 1)
+        mince = self.page("https://x.fr/b", "Page mince", mots=fr.SEUIL_CONTENU_MINCE - 1)
+        self.assertEqual([p["url"] for p in jev.sources_maillage([grasse, mince], {})], ["https://x.fr/a"])
+
+    def test_constat_ne_signale_pas_a_verifier(self):
+        """La bande generique du noul (oui a 0,80) ne se declenche jamais sur cette
+        question et classerait tout en « a verifier ». Voir fr.SEUIL_LIEN."""
+        judged = {"maillage": {"n_candidats": 40, "propositions": [
+            {"source": "https://x.fr/a", "cible": "https://x.fr/b", "entrants_ctx": 0,
+             "p_oui": 0.72, "band_generique": "review", "limite": False}]}}
+        f = score.maillage_findings({}, judged)[0]
+        self.assertEqual(f["needs_review"], 0)
+        self.assertIn("40 candidates", f["evidence"])
+
+    def test_marge_egale_a_l_amplitude_mesuree(self):
+        """0,05 est l'amplitude maximale mesuree entre trois passages identiques."""
+        self.assertEqual(fr.MARGE_LIEN, 0.05)
+        self.assertLess((fr.SEUIL_LIEN + 0.02) - fr.SEUIL_LIEN, fr.MARGE_LIEN)
+        self.assertGreaterEqual((fr.SEUIL_LIEN + 0.10) - fr.SEUIL_LIEN, fr.MARGE_LIEN)
+
+    def test_regles_deterministes_sans_jev(self):
+        """Le constat « votre maillage est le menu » ne coute rien et doit sortir
+        meme avec --no-jev."""
+        crawl = crawl_fixture()
+        urls = [f"{crawl['origin']}/p{i}" for i in range(6)]
+        # Six pages qui se lient toutes entre elles : le graphe EST la navigation.
+        crawl["pages"] = [self.page(u, f"Page {i}", liens=[v for v in urls if v != u]) for i, u in enumerate(urls)]
+        crawl["final_url"] = urls[0]
+        ids = {f["id"] for f in checks.run_checks(crawl)}
+        self.assertIn("maillage_gabarit", ids)
+        self.assertIn("maillage_sans_entrant", ids)
+
 
 
 if __name__ == "__main__":

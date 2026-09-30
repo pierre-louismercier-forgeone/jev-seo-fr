@@ -84,7 +84,7 @@ def audit(args) -> Path:
     else:
         judged = jev.judge(site, pages[: args.jev_pages], args.jev_budget, log=log, dfs=dfs)
     timings["jev"] = round(time.monotonic() - t, 1)
-    findings += score.jev_findings(site, judged) + score.dfs_findings(site, judged, dfs)
+    findings += score.jev_findings(site, judged) + score.maillage_findings(site, judged) + score.dfs_findings(site, judged, dfs)
 
     stage(5, "skipped (--no-psi)" if args.no_psi else f"{args.psi_pages} pages x mobile and desktop, about 30 to 60 seconds")
     t = time.monotonic()
@@ -241,7 +241,7 @@ def rescore(args) -> None:
     # FR: la Search Console est relue depuis le fichier, jamais rappelee : un
     # rescore ne doit ni reseau ni depense. Sans cette ligne, les constats
     # mesures disparaissaient silencieusement au premier recalcul.
-    findings = (checks.run_checks(site) + score.jev_findings(site, d["jev"])
+    findings = (checks.run_checks(site) + score.jev_findings(site, d["jev"]) + score.maillage_findings(site, d["jev"])
                 + score.dfs_findings(site, d["jev"], d.get("dataforseo"))
                 + score.gsc_findings(site, d.get("gsc")) + perf_findings(d.get("performance")))
     d["findings"] = findings

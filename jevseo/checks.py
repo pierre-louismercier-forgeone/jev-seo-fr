@@ -95,6 +95,12 @@ RULES = {
     "host_variant": ("crawl", "medium", "www and non-www both serve the site", "Redirect the alternate host to the preferred host with a permanent redirect.", "canonical", 1, False),
     "no_https": ("security", "high", "Site not served over HTTPS, or HTTP does not redirect to HTTPS", "Serve every page over HTTPS and permanently redirect HTTP to HTTPS.", "https", 2, False),
     "deep_pages": ("links", "low", "Pages more than three clicks from the homepage", "Link important deep pages from hubs or navigation closer to the homepage.", "links", 2, True),
+    # FR: deux constats que `orphan_pages` ne peut pas voir. Sur un site mesure,
+    # chaque page affichait 29 liens entrants et aucun n'etait autre chose que le
+    # menu : `inlinks == 0` ne se declenche jamais, et pourtant il n'existe aucun
+    # maillage editorial. Voir fr.graphe_maillage.
+    "maillage_gabarit": ("links", "medium", "Le maillage interne est la navigation", "Ajoutez des liens dans le corps des pages, vers la page utile a ce moment de la lecture. Un lien present sur toutes les pages ne transmet aucune information de sujet.", "links", 3, True),
+    "maillage_sans_entrant": ("links", "medium", "Pages qui ne recoivent aucun lien depuis le corps d'une autre page", "Faites citer ces pages depuis les pages qui traitent du meme sujet, dans le texte et non dans le menu.", "links", 2, True),
     "orphan_pages": ("links", "medium", "Sitemap pages with no internal links (orphans)", "Link these pages from relevant pages so users and crawlers can reach them.", "links", 2, False),
     "js_dependent": ("crawl", "medium", "Content only appears after JavaScript runs", "Server-render or pre-render primary content and links.", "js", 4, False),
     "title_missing": ("onpage", "high", "Pages without a title", "Write a unique, descriptive title for each page.", "title", 1, False),
@@ -267,6 +273,24 @@ def run_checks(crawl: dict) -> list[dict]:
     orphans = [p["url"] for p in pages if p.get("in_sitemap") and p.get("inlinks", 0) == 0 and p["url"] != home]
     if orphans:
         out.append(finding("orphan_pages", orphans, f"{len(orphans)} sitemap pages received no internal links from the crawled pages: " + ", ".join(urlparse(u).path or "/" for u in orphans[:6])))
+    # FR: maillage. Le gabarit (menu, pied, blocs repetes) est retire avant de
+    # compter, sinon le graphe ne mesure que la presence d'un menu.
+    g = fr.graphe_maillage(pages)
+    if g["n_sources"] >= 5 and g["part_gabarit"] >= 0.80:
+        out.append(finding("maillage_gabarit", [home],
+                           "%.0f %% des liens internes vont vers %d cibles liees depuis au moins la moitie des pages, dont %d depuis la navigation entiere. Il reste %d liens de contenu sur %d pages."
+                           % (g["part_gabarit"] * 100, len(g["gabarit"]), len(g["sitewide"]),
+                              sum(len(v) for v in g["contextuels"].values()), g["n_sources"]),
+                           {"part_gabarit": g["part_gabarit"], "sitewide": sorted(g["sitewide"])[:50],
+                            "liens_contextuels": sum(len(v) for v in g["contextuels"].values())}))
+    sans_ctx = [p["url"] for p in pages
+                if p.get("kind") == "page" and p.get("status") == 200 and p["url"] != home
+                and not g["entrants_ctx"].get(p["url"])]
+    if sans_ctx and g["n_sources"] >= 5 and len(sans_ctx) < g["n_sources"]:
+        out.append(finding("maillage_sans_entrant", sans_ctx,
+                           "%d pages sur %d ne sont citees que par le menu : " % (len(sans_ctx), g["n_sources"])
+                           + ", ".join(urlparse(u).path or "/" for u in sans_ctx[:6]),
+                           {"entrants_ctx": g["entrants_ctx"]}))
     js = [p["url"] for p in pages if p.get("js_dependent")]
     if js:
         out.append(finding("js_dependent", js, f"{len(js)} pages had under 60 words in raw HTML and more after rendering"))

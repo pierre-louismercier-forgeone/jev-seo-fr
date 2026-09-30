@@ -43,6 +43,21 @@ def _libelles() -> dict:
     return out
 
 
+def _maillage(d: dict) -> dict:
+    m = (d.get("jev") or {}).get("maillage") or {}
+    g = fr.graphe_maillage(d["pages"])
+    return {
+        "n_sources": g["n_sources"], "n_cibles": len(g["sources_par_cible"]),
+        "n_sitewide": len(g["sitewide"]), "n_gabarit": len(g["gabarit"]),
+        "part_gabarit": g["part_gabarit"],
+        "liens_contextuels": sum(len(v) for v in g["contextuels"].values()),
+        "sans_entrant": len([u for u, _ in g["sources_par_cible"].items() if not g["entrants_ctx"].get(u)]),
+        "n_candidats": m.get("n_candidats") or 0,
+        "seuil": fr.SEUIL_LIEN, "marge": fr.MARGE_LIEN,
+        "propositions": m.get("propositions") or [],
+    }
+
+
 def payload(d: dict) -> dict:
     site, scores = d["site"], d["scores"]
     domaine = site["domain"]
@@ -101,6 +116,11 @@ def payload(d: dict) -> dict:
         "poids": scores["weights"], "notes_calcul": scores["notes"],
         "plafonds": scores.get("caps") or [], "partiel": scores.get("partial") or [],
         "pages": pages, "actions": actions,
+        # FR: le maillage n'est pas une propriete d'une page, c'est une propriete
+        # du graphe. Il lui faut son propre onglet, avec le partage gabarit /
+        # contextuel en tete, sinon le lecteur croit que `liens_entrants: 29`
+        # veut dire quelque chose.
+        "maillage": _maillage(d),
         "libelles": _libelles(),
         "roles": {k: (v if isinstance(v, str) else v.get("what", "")) for k, v in fr.ROLES_PASSAGE.items()},
         "roles_courts": {"reponse": "Réponse", "preuve": "Preuve", "decor": "Décor",

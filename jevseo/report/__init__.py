@@ -333,6 +333,42 @@ def view_model(d: dict, folder: Path) -> dict:
     }
 
 
+def plan_maillage(data: dict):
+    """Propositions de lien, ou None s'il n'y en a pas."""
+    return ((data.get("jev") or {}).get("maillage") or {}).get("propositions") or None
+
+
+def plan_maillage_csv(data: dict, path: Path) -> Path:
+    """Une ligne par lien a poser, dans l'ordre de travail.
+
+    L'ancre n'est PAS generee : Jev ne produit aucun texte, et une ancre ecrite
+    par le script serait une ancre generique de plus. La colonne donne le H1 de
+    la cible comme matiere premiere, a reformuler par le redacteur pour que
+    l'ancre decrive la destination dans le fil de la phrase.
+    """
+    import csv
+
+    props = plan_maillage(data) or []
+    cols = ["priorite", "page_source", "titre_source", "page_cible", "titre_cible",
+            "ancre_matiere_premiere", "liens_entrants_contextuels_cible", "p_oui", "limite", "proximite_vocabulaire"]
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for x in props:
+            w.writerow({
+                # Une page qui ne recoit aucun lien de contenu passe devant : c'est
+                # la ou un lien change quelque chose.
+                "priorite": "P1" if x["entrants_ctx"] == 0 and not x.get("limite") else "P2",
+                "page_source": x["source"], "titre_source": x.get("source_titre") or "",
+                "page_cible": x["cible"], "titre_cible": x.get("cible_titre") or "",
+                "ancre_matiere_premiere": x.get("cible_h1") or x.get("cible_titre") or "",
+                "liens_entrants_contextuels_cible": x["entrants_ctx"],
+                "p_oui": x["p_oui"], "limite": "oui" if x.get("limite") else "",
+                "proximite_vocabulaire": x.get("proximite"),
+            })
+    return path
+
+
 def build(folder: Path, formats: list[str], log=print) -> dict:
     data = json.loads((folder / "audit.json").read_text())
     log("building charts")
@@ -365,6 +401,11 @@ def build(folder: Path, formats: list[str], log=print) -> dict:
     # FR: l'explorateur ne recalcule rien, il ouvre audit.json. Le rapport A4
     # dit ce qui ne va pas ; l'explorateur dit pourquoi Jev l'a dit, sur quelle
     # page, avec quelle certitude.
+    # FR: le plan de maillage est un livrable a part, parce qu'il ne se lit pas,
+    # il se travaille : une ligne = un lien a poser, cochable par le redacteur.
+    plan = plan_maillage(data)
+    if plan is not None:
+        written["maillage"] = plan_maillage_csv(data, folder / "plan-maillage.csv")
     if "explorer" in formats:
         from jevseo.report.explorer import write_explorer
 

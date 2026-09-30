@@ -363,6 +363,97 @@ du plan, impact 100.
 Console, les constats mesures disparaissaient donc silencieusement au premier
 recalcul sans reseau.
 
+### 14. Maillage interne : separer le menu du contenu (1er octobre 2026)
+
+Le crawler remonte `inlinks` par page. Sur le site de recouvrement, chaque page
+en affichait 29. La regle upstream `orphan_pages` cherche `inlinks == 0` : elle
+n'a jamais rien trouve, et le rapport laissait croire a un maillage dense.
+
+Comptage du graphe, part des pages qui lient chaque cible :
+
+| site | pages | cibles | liees depuis >= 85 % des pages | part des liens internes qui est du gabarit |
+|---|---|---|---|---|
+| recouvrement | 30 | 30 | 30 | **100 %** |
+| imprimeur | 52 | 51 | 6 | 70 % |
+
+Sur le premier site, **la totalite du graphe de liens interne est la
+navigation**. Il n'existe aucun lien editorial. Le `inlinks: 29` ne disait rien
+d'autre que « il y a un menu », repete trente fois.
+
+Le crawl ne stocke que `(url, ancre)` par lien, sans position dans le DOM : on
+ne peut pas lire « ce lien est dans le `<nav>` ». On n'en a pas besoin. Une
+cible liee depuis presque toutes les pages est du gabarit, quelle que soit la
+balise qui la porte. La detection est statistique et tient sur les donnees deja
+collectees, sans recrawl.
+
+**Deux seuils, poses par la donnee.** Distribution mesuree sur le site
+imprimeur, part des pages qui lient chaque cible :
+
+```
+98 98 98 98 98 88 | 79 79 79 62 | 31 17 17 15 15 15 13 13 ...
+```
+
+Trois plateaux et un trou franc entre 62 % et 31 %. Le premier plateau est le
+menu, le deuxieme un bloc « dernieres actualites » repete en sidebar, le
+troisieme les vrais liens de contenu. Le seuil de separation est donc a 0,50,
+dans le trou. Le seuil strict a 0,85 ne sert qu'a raconter le menu separement du
+bloc recurrent.
+
+**Un defaut que seul un petit site revele.** Une page ne se lie pas elle-meme,
+donc une entree de menu plafonne mecaniquement a `(n-1)/n`. Avec `n` au
+denominateur, un menu parfaitement site-wide passait sous 0,85 des que le site
+avait six pages ou moins, et le gabarit devenait invisible. Le denominateur est
+`n-1`. Trouve par un test, pas par un audit : sur trente pages le rapport vaut
+0,967 et le defaut ne se voyait pas.
+
+**Trois constats, deux gratuits.** `maillage_gabarit` et
+`maillage_sans_entrant` sont deterministes, dans `checks.py`, et sortent meme
+avec `--no-jev`. Le troisieme, `jev_maillage_manquant`, dit ou mettre les liens.
+
+**Huit cibles, pas 255.** Le code presélectionne par proximite de vocabulaire
+(titre, H1, plan) ponderee par le besoin de la cible, puis Jev juge une question
+BINAIRE par paire : « ce lecteur a-t-il une raison honnete de suivre ce lien ? »
+Une question a choix unique aurait force une seule cible par page, alors qu'une
+page doit pouvoir en lier plusieurs. Mesure du 30 septembre : un `choice` a 8
+options donne 55 % de reponses decisives, le meme a 29 options en donne zero.
+
+**Le seuil de 0,60, et pourquoi pas la bande generique.** 48 paires jugees trois
+fois, sur deux sites :
+
+- stabilite, identique partout : amplitude de P(oui) entre passages de **0,02 en
+  mediane, 0,05 au pire**, 100 % des paires bougeant de moins de 0,05. La valeur
+  est un signal, pas du bruit ;
+- plage compressee, sur les deux sites : le P(oui) maximum observe est 0,77 puis
+  0,67. **La bande generique du noul, qui dit oui a partir de 0,80, ne se
+  declenche jamais** et jetait tous les liens reels. Elle est calibree pour des
+  questions ou le modele peut etre quasi certain ; « ce lien aide-t-il ce
+  lecteur » est un jugement editorial ;
+- forme de la distribution, differente selon le site : trou de 0,21 entre 0,49 et
+  0,70 sur le premier, continuum sur le second dont le plus grand ecart est 0,07.
+  **Il n'y a pas de trou universel ou poser le seuil, et il faut le dire.**
+
+D'ou la regle : on filtre sur la valeur et non sur la bande, a 0,60, et toute
+proposition a moins de 0,05 du seuil est marquee `limite`, parce qu'a cette
+distance le verdict peut basculer. A 0,60 le verdict est identique aux trois
+passages pour 100 % des paires du premier site et 98 % du second, la seule paire
+discordante etant exactement celle qui frole le seuil.
+
+**Ce que ca donne.** Sur le site de recouvrement, 232 paires candidates, **6
+liens retenus**, 2 secondes, moins d'un centime. Les 226 paires refusees sont
+les croisements ville x ville, qui n'ont aucune raison editoriale de se lier.
+Les six retenus sont amiable <-> judiciaire, l'accueil vers judiciaire et vers
+la relance de factures, et la page « qu'est-ce qu'un creancier » vers les deux
+pages de procedure. C'est exactement ce qu'un redacteur aurait ecrit.
+
+**L'ancre n'est pas generee.** Jev ne produit aucun texte, et une ancre ecrite
+par le script serait une ancre generique de plus, c'est-a-dire le probleme que
+`generic_anchors` signale par ailleurs. `plan-maillage.csv` donne le H1 de la
+cible comme matiere premiere, a reformuler.
+
+Livrables : un onglet **Maillage** dans l'explorateur, qui met le partage
+gabarit / contenu en tete parce que sans lui le nombre de liens entrants d'une
+page ne veut rien dire, et `plan-maillage.csv`, une ligne par lien a poser.
+
 ## Ce qui n'est pas encore fait
 
 - Un seul site teste, et il est bien construit. La regle `doorway_pages` n'a
@@ -370,13 +461,16 @@ recalcul sans reseau.
 - L'A/B de langue n'a tourne que sur un corpus. Le verdict est net, mais il
   porte sur un site de service B2B national a pages ville ; un autre secteur
   pourrait donner un ecart different.
+- Le seuil de maillage a 0,60 tient sur deux sites. Sur le second il tombe dans
+  un continuum, pas dans un trou : a reverifier sur un site d'une troisieme
+  forme (e-commerce, documentation) avant de le considerer comme acquis.
 - Le PDF reste indisponible sur cette machine (Pango/GLib absents).
 - Les captures d'ecran de `docs/assets/` sont encore celles de l'upstream.
 
 ## Etat des tests
 
-`python -m unittest discover -s tests` : **57 tests, tous verts**, dont 19
-nouveaux couvrant les correctifs francais. Les tests de rendu acceptent
+`python -m unittest discover -s tests` : **92 tests, tous verts**, dont 27
+nouveaux couvrant les correctifs francais, dont 8 sur le maillage interne. Les tests de rendu acceptent
 desormais `report.html` quand WeasyPrint est indisponible, et exigent toujours
 qu'un document soit produit.
 

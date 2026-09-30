@@ -43,10 +43,14 @@ JEV_RULES = {
     "jev_sans_reponse": ("content", "high", "Pages ou aucun passage ne repond", "Ecrivez le passage qui manque : la reponse concrete a ce que la page promet. En l'etat, le texte tourne autour du sujet sans le traiter.", "helpful", 3),
     "jev_page_creuse": ("content", "medium", "Pages surtout composees de decor", "Remplacez le remplissage et les listes de liens par du contenu porteur : reponse, preuve verifiable, description d'offre, traitement d'objection.", "helpful", 3),
     "jev_cannibalization": ("content", "medium", "Pages qui se disputent les memes recherches", "Tranchez : une page par besoin de recherche. Fusionnez, differenciez, ou canonicalisez la plus faible.", "canonical", 2),
+    # FR: maillage. Les regles deterministes de checks.py disent que le maillage
+    # editorial manque ; celle-ci dit ou mettre les liens. Voir fr.cibles_maillage :
+    # le code presélectionne 8 cibles, Jev juge l'utilite du lien pour le lecteur.
+    "jev_maillage_manquant": ("links", "medium", "Liens de contenu manquants entre pages qui se repondent", "Ajoutez ces liens dans le corps du texte, a l'endroit ou le lecteur en a besoin, avec une ancre qui decrit la destination.", "links", 2),
 }
 LOW = 0.45  # normalised Score below this becomes a finding
 # Jev findings whose advice is editorial rather than a documented search engine requirement
-HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step", "jev_preuve_locale", "jev_coordonnees_locales", "jev_reponse_enterree", "jev_sans_reponse", "jev_page_creuse"}
+HEURISTIC_JEV = {"jev_entity_clarity", "jev_answer_first", "jev_citable", "jev_rewrite", "jev_h1_fit", "jev_next_step", "jev_preuve_locale", "jev_coordonnees_locales", "jev_reponse_enterree", "jev_sans_reponse", "jev_page_creuse", "jev_maillage_manquant"}
 REACHABLE_KD = 30  # DataForSEO keyword difficulty treated as winnable without major authority (heuristic)
 DFS_RULES = {
     "dfs_striking": ("visibility", "medium", "Mots cles pertinents aux portes de la premiere page", "Renforcez la page positionnee sur chaque mot cle : repondez plus completement a la recherche, ajoutez-lui des liens internes et resserrez son title.", "dfs_labs", 2),
@@ -201,6 +205,30 @@ def opportunity_key(k: dict) -> tuple:
     kd = k.get("difficulty")
     tier = 2 if kd is not None and kd <= REACHABLE_KD else 1 if kd is None else 0
     return (tier, (k.get("volume") or 0) * (1 - min(kd if kd is not None else 50, 100) / 100))
+
+
+def maillage_findings(crawl: dict, judged: dict) -> list[dict]:
+    """Liens proposes par Jev, regroupes en un seul constat.
+
+    Un constat par lien noierait le rapport : ce qui compte est la liste, pas
+    chaque ligne. Les urls du constat sont les pages SOURCES, celles ou il y a
+    un geste a faire.
+    """
+    m = (judged or {}).get("maillage") or {}
+    props = m.get("propositions") or []
+    if not props:
+        return []
+    srcs = sorted({x["source"] for x in props})
+    orphelines = sum(1 for x in props if x["entrants_ctx"] == 0)
+    # `needs_review` reste a zero volontairement : sur cette question la bande
+    # generique du noul (oui a partir de 0,80) est inadaptee et classerait tout
+    # en « a verifier ». Le filtre est la valeur, mesuree stable a 0,05 pres sur
+    # trois passages, avec un trou franc dans la distribution. Voir fr.SEUIL_LIEN.
+    limites = sum(1 for x in props if x.get("limite"))
+    ev = ("%d liens de contenu proposes depuis %d pages sur %d candidates, dont %d vers des pages qui n'en recoivent aucun aujourd'hui."
+          % (len(props), len(srcs), m.get("n_candidats") or len(props), orphelines)
+          + (" %d sont a la limite du seuil et demandent un oeil humain." % limites if limites else ""))
+    return [jev_finding("jev_maillage_manquant", srcs, ev, 0, {"propositions": props[:200]})]
 
 
 def dfs_finding(rule_id: str, urls: list[str], count: int, evidence: str, detail: dict | None = None, review: int = 0, heuristic: bool = False) -> dict:

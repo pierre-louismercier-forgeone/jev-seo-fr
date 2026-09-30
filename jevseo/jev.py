@@ -376,6 +376,56 @@ def pair_summary(p: dict) -> dict:
     return {"url": p["url"], "title": p.get("title"), "h1": (p.get("h1") or [None])[0], "text": (p.get("text_excerpt") or "")[:1200]}
 
 
+# ---------------------------------------------------------------- maillage interne (FR)
+def maillage_state(source: dict, cibles: list[dict], site_ctx: dict) -> dict:
+    """Etat pour la passe maillage : la page source, puis les cibles candidates.
+
+    Les cibles sont resumees, pas envoyees en entier : Jev juge l'utilite d'un
+    lien pour le lecteur, ce qui se decide sur la promesse de la cible (titre,
+    H1, plan, ouverture), pas sur ses 6 000 caracteres.
+    """
+    return {
+        "site": site_ctx,
+        "page": {
+            "url": source["url"],
+            "title": source.get("title"),
+            "h1": (source.get("h1") or [None])[0],
+            "outline": source.get("outline", [])[:20],
+            "text": (source.get("text_excerpt") or "")[:PAGE_TEXT_CHARS],
+        },
+        "cibles": {
+            f"c{i}": {
+                "url": c["page"]["url"],
+                "title": c["page"].get("title"),
+                "h1": (c["page"].get("h1") or [None])[0],
+                "outline": c["page"].get("outline", [])[:12],
+                "opening": opening(c["page"]),
+            }
+            for i, c in enumerate(cibles)
+        },
+    }
+
+
+def sources_maillage(pages: list[dict], judged_pages: dict) -> list[dict]:
+    """Pages depuis lesquelles un lien editorial a un sens.
+
+    Une page mince n'a rien d'ou lier : le lien y serait decoratif. Une page de
+    mentions legales ou de contact non plus. Le code filtre, Jev ne voit que des
+    sources plausibles.
+    """
+    out = []
+    for p in pages:
+        if p.get("kind") != "page" or p.get("status") != 200:
+            continue
+        if (p.get("word_count") or 0) < fr.SEUIL_CONTENU_MINCE:
+            continue
+        t = ((judged_pages.get(p["url"]) or {}).get("page_type") or {}).get("value")
+        if t in fr.SANS_MAILLAGE:
+            continue
+        out.append(p)
+    return out
+
+
 # ---------------------------------------------------------------- keywords (full mode)
 RELEVANCE = [
     "Unrelated to what the site offers; traffic from it would not become customers",
@@ -581,6 +631,55 @@ def judge(crawl: dict, pages: list[dict], budget_usd: float, log=print, dfs: dic
         ans = jev.ask(state, {f"pair_{i}": pair_question(f"pair_{i}") for i in range(len(chunk))})
         for i, (a, b, jac) in enumerate(chunk):
             out["pairs"].append({"a": a["url"], "b": b["url"], "title_overlap": jac, "judgment": ans[f"pair_{i}"] if ans else None})
+    # FR: maillage interne. Le graphe brut ne mesure rien tant qu'on n'a pas
+    # retire le gabarit : sur un site mesure, 100 % des liens internes etaient
+    # le menu, et `inlinks: 29` par page ne disait rien d'autre que « il y a un
+    # menu ». Le code separe, Jev juge l'utilite du lien pour le lecteur.
+    graphe = fr.graphe_maillage(pages)
+    srcs = sources_maillage(pages, out["pages"])
+    out["maillage"] = {
+        "n_sources": graphe["n_sources"],
+        "n_cibles": len(graphe["sources_par_cible"]),
+        "n_sitewide": len(graphe["sitewide"]),
+        "n_gabarit": len(graphe["gabarit"]),
+        "part_gabarit": graphe["part_gabarit"],
+        "entrants_ctx": graphe["entrants_ctx"],
+        "sans_entrant_ctx": sorted(p["url"] for p in pages
+                                   if p.get("kind") == "page" and p.get("status") == 200
+                                   and not graphe["entrants_ctx"].get(p["url"])),
+        "n_candidats": 0,
+        "propositions": [],
+    }
+    lots = [(p, fr.cibles_maillage(p, pages, graphe, out["pages"])) for p in srcs]
+    lots = [(p, c) for p, c in lots if c]
+    out["maillage"]["n_candidats"] = sum(len(c) for _, c in lots)
+    if lots:
+        log(f"Jev: maillage interne, {sum(len(c) for _, c in lots)} liens candidats depuis {len(lots)} pages")
+
+        def un_lot(lot):
+            p, cibles = lot
+            return lot, jev.ask(maillage_state(p, cibles, site_ctx), fr.questions_maillage(cibles, noul))
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            for (p, cibles), ans in pool.map(un_lot, lots):
+                if not ans:
+                    continue
+                for i, c in enumerate(cibles):
+                    a = ans.get(f"lien_{i}")
+                    if not a or a["value"] < fr.SEUIL_LIEN:
+                        continue
+                    out["maillage"]["propositions"].append({
+                        "source": p["url"], "source_titre": p.get("title"),
+                        "cible": c["page"]["url"], "cible_titre": c["page"].get("title"),
+                        "cible_h1": (c["page"].get("h1") or [None])[0],
+                        "proximite": c["proximite"], "entrants_ctx": c["entrants_ctx"],
+                        "p_oui": a["value"], "band_generique": a["band"],
+                        "limite": a["value"] - fr.SEUIL_LIEN < fr.MARGE_LIEN,
+                        "deja_au_menu": c["page"]["url"] in graphe["sitewide"],
+                    })
+        out["maillage"]["propositions"].sort(key=lambda x: (x["entrants_ctx"], -x["p_oui"]))
+        log(f"Jev: {len(out['maillage']['propositions'])} liens retenus (P(oui) >= {fr.SEUIL_LIEN})")
+
     if dfs and dfs.get("available"):
         # A balanced mix, not the biggest volumes: niche suggestions are where small sites win,
         # and high-volume gap terms borrowed from large competitors are mostly unrelated.
