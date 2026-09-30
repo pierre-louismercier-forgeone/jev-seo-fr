@@ -61,6 +61,12 @@ DFS_RULES = {
     # 94/100 sur un site qui fait 5 visites estimees par mois. Un tel chiffre
     # dans un livrable client detruit la credibilite du rapport.
     "dfs_invisible": ("visibility", "critical", "Aucune requete metier dans le top 20", "Le site ne se positionne sur aucune recherche liee a son activite, en premiere ou deuxieme page. Avant toute optimisation, il faut creer les pages qui repondent aux intentions commerciales du metier : une page par prestation, puis une page par couple prestation x cible ou prestation x zone.", "dfs_labs", 4),
+    # FR: constats issus de la Search Console. Seule source de CLICS REELS.
+    # Le crawl decrit, DataForSEO estime, Jev juge ; aucun ne mesure.
+    "gsc_cannibalisation_reelle": ("visibility", "high", "Plusieurs pages se disputent reellement la meme requete", "Choisissez la page qui doit porter chaque requete, puis desindexez, fusionnez ou reorientez les autres. Contrairement a une cannibalisation estimee, celle-ci est constatee : Google affiche deja plusieurs de vos URL sur ces recherches et n'en privilegie aucune.", "canonical", 2),
+    "gsc_impressions_sans_clics": ("visibility", "medium", "Requetes ou le site est vu mais jamais choisi", "Le positionnement n'est pas le probleme sur ces requetes, la promesse l'est. Reecrivez le title et la meta description de la page qui ressort, en repondant a la recherche dans les mots de l'internaute.", "snippet", 1),
+    "gsc_a_portee": ("visibility", "medium", "Requetes a portee de la premiere page", "Ces requetes ont des impressions reelles entre la 4e et la 20e place. Renforcez la page qui ressort : repondez plus completement, ajoutez-lui des liens internes, resserrez son title.", "dfs_labs", 2),
+    "gsc_pages_motrices": ("visibility", "info", "Pages qui portent la majorite des clics", "A proteger avant toute refonte : conservez leurs URL, ou redirigez-les en permanent vers l'equivalent exact. Toute perte ici se paie immediatement en trafic.", "redirects", 1),
     "dfs_broken_backlinks": ("visibility", "medium", "Backlinks pointant vers des pages cassees", "Redirigez chaque cible cassee vers la page vivante la plus proche pour que ces liens comptent a nouveau.", "dfs_backlinks", 1),
     "dfs_aio_not_cited": ("ai", "low", "Apercus IA qui ne citent pas le site", "Regardez qui est cite aujourd'hui et assurez-vous que la page repond directement a la recherche. Google indique qu'aucune exigence supplementaire n'existe pour apparaitre dans les Apercus IA au-dela de l'eligibilite normale a la recherche.", "ai", 2),
 }
@@ -201,6 +207,60 @@ def dfs_finding(rule_id: str, urls: list[str], count: int, evidence: str, detail
     cat, sev, title, fix, src, effort = DFS_RULES[rule_id]
     return {"id": rule_id, "origin": "dataforseo", "category": cat, "severity": sev, "title": title, "fix": fix, "source": SRC[src], "effort": effort,
             "heuristic": heuristic, "urls": urls, "count": count, "evidence": evidence, "needs_review": review, "detail": detail or {}}
+
+
+def gsc_finding(rule_id: str, urls: list[str], count: int, evidence: str, detail: dict | None = None, review: int = 0) -> dict:
+    """Comme dfs_finding, mais l'origine dit « Search Console ».
+
+    La distinction compte dans un livrable : DataForSEO estime un marche,
+    la Search Console mesure des clics. Les deux ne se defendent pas pareil
+    devant un client.
+    """
+    return dfs_finding(rule_id, urls, count, evidence, detail, review) | {"origin": "gsc"}
+
+
+def gsc_findings(crawl: dict, g: dict | None) -> list[dict]:
+    """Constats fondes sur des clics reels, pas sur des estimations."""
+    if not g or not g.get("available"):
+        return []
+    from jevseo import gsc as gsc_mod
+
+    out, home = [], crawl["final_url"]
+    court = lambda u: urlparse(u).path or "/"
+
+    can = gsc_mod.cannibalisation_reelle(g["paires"])
+    if can:
+        urls = sorted({x["url"] for c in can for x in c["urls"]})
+        out.append(gsc_finding(
+            "gsc_cannibalisation_reelle", urls[:60], len(can),
+            "; ".join(f"« {c['requete']} » : {len(c['urls'])} URL, {c['impressions']} impressions, {c['clics']} clics"
+                      for c in can[:5]),
+            {"requetes": can[:40]}, 0))
+
+    isc = gsc_mod.impressions_sans_clics(g["requetes"])
+    if isc:
+        out.append(gsc_finding(
+            "gsc_impressions_sans_clics", [home], len(isc),
+            "; ".join(f"« {r['requete']} » : {r['impressions']} impressions, {r['clics']} clic"
+                      + (f", position {r['position']}" if r["position"] else "") for r in isc[:6]),
+            {"requetes": isc[:40]}, 0))
+
+    ap = gsc_mod.a_portee(g["requetes"])
+    if ap:
+        out.append(gsc_finding(
+            "gsc_a_portee", [home], len(ap),
+            "; ".join(f"« {r['requete']} » : position {r['position']}, {r['impressions']} impressions" for r in ap[:6]),
+            {"requetes": ap[:40]}, 0))
+
+    pm = gsc_mod.pages_motrices(g["pages"])
+    if pm:
+        total = g["totaux"]["clics"] or 1
+        out.append(gsc_finding(
+            "gsc_pages_motrices", [p["url"] for p in pm], len(pm),
+            f"{len(pm)} pages sur {len(g['pages'])} portent {sum(p['clics'] for p in pm) / total:.0%} des clics ; "
+            + "; ".join(f"{court(p['url'])} : {p['clics']} clics" for p in pm[:5]),
+            {"pages": pm}, 0))
+    return out
 
 
 def dfs_findings(crawl: dict, judged: dict, dfs: dict | None) -> list[dict]:

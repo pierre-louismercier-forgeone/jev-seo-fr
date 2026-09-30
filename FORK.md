@@ -322,6 +322,47 @@ Limite connue : le role `decor` reste faiblement decisif (10 %) sur les deux
 sites. C'est le residu, celui qui attrape ce que les trois autres n'ont pas
 pris ; il est a lire comme un signal, pas comme un verdict.
 
+### 13. Search Console : la seule couche qui mesure
+
+Le crawl decrit le site, DataForSEO estime un marche, Jev juge un contenu.
+**Aucun des trois ne dit ce qui rapporte deja des clics.** Avant une refonte,
+c'est pourtant la premiere question : qu'est-ce qu'on risque de casser ?
+
+`jevseo/gsc.py`, lecture seule, gratuite, **active par defaut** : elle s'efface
+d'elle-meme si le jeton manque ou si la propriete n'est pas accessible
+(`--no-gsc` pour la couper, `--gsc-days` pour la fenetre, 28 jours par defaut).
+Authentification par le jeton OAuth de `~/.config/lunae/gsc_token.json`,
+surchargeable par `GSC_TOKEN_FILE`.
+
+Quatre constats, tous fondes sur des clics reels :
+
+| Regle | Ce qu'elle dit |
+|---|---|
+| `gsc_cannibalisation_reelle` (eleve) | Google affiche deja plusieurs de vos URL sur la meme requete. **Constate, pas estime** : la couche Jev demande a un modele si deux pages viseraient la meme intention, ici Google montre qu'il hesite deja. |
+| `gsc_impressions_sans_clics` (moyen) | Le site est vu et jamais choisi. Le positionnement n'est pas le probleme, la promesse l'est. |
+| `gsc_a_portee` (moyen) | Entre la 4e et la 20e place avec des impressions reelles. |
+| `gsc_pages_motrices` (information) | Les pages qui portent 80 % des clics. **A produire avant toute refonte.** |
+
+Les constats portent l'origine `gsc` et non `dataforseo` : dans un livrable,
+une mesure et une estimation ne se defendent pas pareil devant un client.
+
+**Un piege GSC que le module traite explicitement.** La dimension « requete »
+est filtree, Google retire les requetes anonymisees, elle sous-compte donc
+systematiquement. Sur clw.fr : **174 clics sur la dimension page, 56 seulement
+sur la dimension requete**, soit une couverture de 32 %. Les totaux se lisent
+donc sur la dimension page, et `totaux.couverture_requetes` dit quelle part du
+trafic une lecture par requete couvre reellement.
+
+Premiere mesure sur clw.fr, 28 jours : 174 clics pour 35 635 impressions, soit
+un CTR de 0,49 %. **129 requetes en cannibalisation reelle**, dont « societe de
+recouvrement » : 871 impressions, **zero clic**, quatre URL dont l'accueil en
+14,5e place et un article de blog en 73e. Le constat devient la premiere action
+du plan, impact 100.
+
+**Regression corrigee au passage** : `rescore` ne relisait pas la Search
+Console, les constats mesures disparaissaient donc silencieusement au premier
+recalcul sans reseau.
+
 ## Ce qui n'est pas encore fait
 
 - Un seul site teste, et il est bien construit. La regle `doorway_pages` n'a

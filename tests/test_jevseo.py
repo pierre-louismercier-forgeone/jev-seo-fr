@@ -892,3 +892,77 @@ class AnatomieTests(unittest.TestCase):
         roles = [k for k in jev.page_questions(p) if k.startswith("role_")]
         self.assertTrue(roles)
         self.assertEqual(len(jev.page_state(p, {})["page"]["passages"]), len(roles))
+
+
+class SearchConsoleTests(unittest.TestCase):
+    """FR: la Search Console est la seule couche qui mesure des clics reels."""
+
+    PAIRES = [
+        {"requete": "societe de recouvrement", "url": "https://x.fr/", "clics": 0, "impressions": 636, "ctr": 0.0, "position": 14.5},
+        {"requete": "societe de recouvrement", "url": "https://x.fr/blog/combien", "clics": 0, "impressions": 140, "ctr": 0.0, "position": 73.1},
+        {"requete": "requete solo", "url": "https://x.fr/a", "clics": 9, "impressions": 200, "ctr": 0.045, "position": 4.0},
+        {"requete": "trop peu vue", "url": "https://x.fr/b", "clics": 0, "impressions": 6, "ctr": 0.0, "position": 60.0},
+        {"requete": "trop peu vue", "url": "https://x.fr/c", "clics": 0, "impressions": 5, "ctr": 0.0, "position": 70.0},
+    ]
+    REQUETES = [
+        {"requete": "vue jamais cliquee", "clics": 0, "impressions": 719, "ctr": 0.0, "position": 21.5},
+        {"requete": "a portee", "clics": 2, "impressions": 506, "ctr": 0.004, "position": 9.9},
+        {"requete": "saine", "clics": 24, "impressions": 81, "ctr": 0.296, "position": 1.0},
+        {"requete": "trop peu vue", "clics": 0, "impressions": 12, "ctr": 0.0, "position": 40.0},
+    ]
+    PAGES = [
+        {"url": "https://x.fr/", "clics": 104, "impressions": 9000, "ctr": 0.011, "position": 18.0},
+        {"url": "https://x.fr/a", "clics": 8, "impressions": 400, "ctr": 0.02, "position": 6.0},
+        {"url": "https://x.fr/b", "clics": 0, "impressions": 300, "ctr": 0.0, "position": 40.0},
+    ]
+
+    def test_cannibalisation_mesuree_pas_jugee(self):
+        from jevseo import gsc
+        can = gsc.cannibalisation_reelle(self.PAIRES)
+        self.assertEqual([c["requete"] for c in can], ["societe de recouvrement"],
+                         "une requete a une seule URL n'est pas une cannibalisation")
+        self.assertEqual(can[0]["impressions"], 776)
+
+    def test_une_paire_trop_peu_vue_est_ecartee(self):
+        """Deux URL a 6 et 5 impressions ne prouvent rien."""
+        from jevseo import gsc
+        self.assertEqual(gsc.cannibalisation_reelle(self.PAIRES, mini_impressions=30), gsc.cannibalisation_reelle(self.PAIRES))
+
+    def test_impressions_sans_clics(self):
+        from jevseo import gsc
+        r = gsc.impressions_sans_clics(self.REQUETES)
+        self.assertEqual([x["requete"] for x in r], ["vue jamais cliquee", "a portee"])
+        self.assertNotIn("saine", [x["requete"] for x in r])
+
+    def test_a_portee_borne_4_a_20(self):
+        from jevseo import gsc
+        self.assertEqual([x["requete"] for x in gsc.a_portee(self.REQUETES)], ["a portee"])
+
+    def test_pages_motrices(self):
+        from jevseo import gsc
+        pm = gsc.pages_motrices(self.PAGES)
+        self.assertEqual([p["url"] for p in pm], ["https://x.fr/"], "une page porte deja 80 % des clics")
+
+    def test_degradation_sans_acces(self):
+        """Ni jeton, ni propriete : la couche s'efface, elle ne plante pas."""
+        from jevseo import score
+        for g in (None, {"available": False, "raison": "propriete absente"}):
+            self.assertEqual(score.gsc_findings({"final_url": "https://x.fr/"}, g), [])
+
+    def test_origine_lisible_dans_le_rapport(self):
+        """DataForSEO estime, la Search Console mesure : le rapport doit le dire."""
+        from jevseo import score
+        g = {"available": True, "paires": self.PAIRES, "requetes": self.REQUETES,
+             "pages": self.PAGES, "totaux": {"clics": 112}}
+        f = score.gsc_findings({"final_url": "https://x.fr/"}, g)
+        self.assertTrue(f)
+        for x in f:
+            self.assertEqual(x["origin"], "gsc")
+            self.assertTrue(x["id"].startswith("gsc_"))
+
+    def test_totaux_lus_sur_la_dimension_page(self):
+        """Piege GSC : la dimension requete est filtree et sous-compte."""
+        from jevseo import gsc
+        self.assertEqual(sum(p["clics"] for p in self.PAGES), 112)
+        self.assertEqual(sum(r["clics"] for r in self.REQUETES), 26)
+        self.assertLess(sum(r["clics"] for r in self.REQUETES), sum(p["clics"] for p in self.PAGES))

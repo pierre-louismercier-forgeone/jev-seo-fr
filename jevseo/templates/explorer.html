@@ -246,7 +246,7 @@ function vueActions(){
     h+=`<div class="act"><div class="t"><span class="id">${a.id}</span><b>${esc(a.titre)}</b>
       <span class="chip ${a.gravite==="critical"?"critique":a.gravite==="high"?"eleve":a.gravite==="medium"?"moyen":"faible"}">${a.gravite}</span>
       <span class="chip">${a.priorite}</span>
-      ${a.origine==="jev"?'<span class="chip jev">jugé par Jev</span>':a.origine==="dataforseo"?'<span class="chip">DataForSEO</span>':'<span class="chip">règle</span>'}
+      ${a.origine==="jev"?'<span class="chip jev">jugé par Jev</span>':a.origine==="gsc"?'<span class="chip jev">Search Console</span>':a.origine==="dataforseo"?'<span class="chip">DataForSEO</span>':'<span class="chip">règle</span>'}
       ${a.heuristique?'<span class="chip">heuristique</span>':""}
       ${a.a_verifier?`<span class="chip rev">${a.a_verifier} à vérifier</span>`:""}
       <span class="imp">impact ${a.impact} · ${a.pages} page${a.pages>1?"s":""}</span></div>

@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 from jevseo import VERSION
 
-STAGES = ["Crawl", "Rule checks", "DataForSEO", "Jev judgments", "PageSpeed", "Scoring", "Render"]
+STAGES = ["Crawl", "Rule checks", "DataForSEO", "Jev judgments", "PageSpeed et Search Console", "Scoring", "Render"]
 T0 = time.monotonic()
 
 
@@ -40,7 +40,7 @@ def default_out(url: str) -> Path:
 
 
 def audit(args) -> Path:
-    from jevseo import checks, crawl, dfs as dfs_mod, jev, psi, score
+    from jevseo import checks, crawl, dfs as dfs_mod, gsc as gsc_mod, jev, psi, score
 
     out = Path(args.out) if args.out else default_out(args.url)
     out.mkdir(parents=True, exist_ok=True)
@@ -95,6 +95,16 @@ def audit(args) -> Path:
         findings += perf_findings(perf)
     timings["pagespeed"] = round(time.monotonic() - t, 1)
 
+    # FR: Search Console. Gratuite, en lecture seule, donc active par defaut ;
+    # elle s'efface d'elle-meme si le jeton manque ou si la propriete n'est pas
+    # accessible. C'est la seule couche qui mesure des clics reels.
+    t = time.monotonic()
+    gsc = None
+    if not args.no_gsc:
+        gsc = gsc_mod.collect(site["domain"], args.gsc_days, log=log)
+        findings += score.gsc_findings(site, gsc)
+    timings["gsc"] = round(time.monotonic() - t, 1)
+
     stage(6)
     scores = score.score(site, findings, judged, perf, dfs)
     acts = score.actions(findings, judged, len(checks.html_pages(site)))
@@ -114,6 +124,7 @@ def audit(args) -> Path:
         "jev": judged,
         "performance": perf,
         "dataforseo": dfs,
+        "gsc": gsc,
         "scores": scores,
         "actions": acts,
     }
@@ -227,7 +238,12 @@ def rescore(args) -> None:
     folder = Path(args.dir)
     d = json.loads((folder / "audit.json").read_text())
     site = dict(d["site"], pages=d["pages"])
-    findings = checks.run_checks(site) + score.jev_findings(site, d["jev"]) + score.dfs_findings(site, d["jev"], d.get("dataforseo")) + perf_findings(d.get("performance"))
+    # FR: la Search Console est relue depuis le fichier, jamais rappelee : un
+    # rescore ne doit ni reseau ni depense. Sans cette ligne, les constats
+    # mesures disparaissaient silencieusement au premier recalcul.
+    findings = (checks.run_checks(site) + score.jev_findings(site, d["jev"])
+                + score.dfs_findings(site, d["jev"], d.get("dataforseo"))
+                + score.gsc_findings(site, d.get("gsc")) + perf_findings(d.get("performance")))
     d["findings"] = findings
     d["passed_rules"] = checks.passed_rules(findings)
     d["scores"] = score.score(site, findings, d["jev"], d.get("performance"), d.get("dataforseo"))
@@ -296,6 +312,11 @@ def main(argv=None) -> None:
         p.add_argument("--anatomy", action="store_true", help="anatomie de page : etiquette le role de chaque passage (ou est la reponse, ou est le remplissage). Ajoute jusqu'a 24 questions par page.")
         p.add_argument("--psi-pages", type=int, default=3, help="pages measured with PageSpeed Insights")
         p.add_argument("--no-psi", action="store_true")
+        # FR: la Search Console est gratuite et en lecture seule. Elle tourne
+        # donc par defaut des qu'un jeton existe ET que la propriete est
+        # accessible ; sinon elle est simplement ignoree.
+        p.add_argument("--no-gsc", action="store_true", help="ne pas lire la Search Console")
+        p.add_argument("--gsc-days", type=int, default=28, help="fenetre Search Console en jours")
         p.add_argument("--full", action="store_true", help="add DataForSEO rankings, keywords, competitors, backlinks, SERPs and AI mentions (paid per call)")
         # FR: l'upstream part sur 2840 (Etats-Unis) et "en". Sur un site
         # francais cela mesure le mauvais marche en silence : positions,

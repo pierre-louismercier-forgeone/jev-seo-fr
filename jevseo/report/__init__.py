@@ -165,8 +165,8 @@ def view_model(d: dict, folder: Path) -> dict:
         a["priority_text"] = PRIORITY_TEXT[a["priority"]]
         a["effort_text"] = EFFORT_TEXT[a["effort"]]
         a["short_urls"] = [short(u, domain) for u in a["urls"][:6]]
-        a["by"] = {"jev": "juge par Jev", "dataforseo": "DataForSEO"}.get(a["origin"], "regle")
-        a["by_class"] = {"jev": "tag-jev", "dataforseo": "tag-dfs"}.get(a["origin"], "tag-rule")
+        a["by"] = {"jev": "juge par Jev", "dataforseo": "DataForSEO", "gsc": "mesure, Search Console"}.get(a["origin"], "regle")
+        a["by_class"] = {"jev": "tag-jev", "dataforseo": "tag-dfs", "gsc": "tag-gsc"}.get(a["origin"], "tag-rule")
 
     status_counts = Counter(str(p.get("status") or "error") for p in d["pages"] if p.get("kind") != "redirect")
     redirects = sum(1 for p in d["pages"] if p.get("kind") == "redirect")
