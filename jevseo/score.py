@@ -58,7 +58,7 @@ DFS_RULES = {
     "dfs_new_page": ("visibility", "medium", "Mots cles pertinents sans page pour se positionner", "Prevoyez une page par besoin de recherche distinct ; commencez par les mots cles au volume le plus fort et a la difficulte la plus faible.", "dfs_labs", 3),
     "dfs_backlink_gap": ("visibility", "medium", "Bien moins de domaines referents que les sites positionnes sur les memes mots cles", "Gagnez des liens depuis les sites que votre audience lit deja : donnees originales, outils, expertise invitee et pages partenaires.", "dfs_backlinks", 4),
     # FR: l'absence d'opportunite etait notee comme l'absence de probleme.
-    # Sur publi3.com, 11 mots cles positionnes mais tous hors sujet et au-dela
+    # Sur un site d'imprimeur, 11 mots cles positionnes mais tous hors sujet et au-dela
     # de la 20e place : aucune regle ne pouvait se declencher (dfs_striking
     # exige une position entre 4 et 20, les regles d'opportunite exigent une
     # pertinence jugee), donc rien n'etait deduit et la visibilite sortait a

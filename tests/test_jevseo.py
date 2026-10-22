@@ -590,8 +590,8 @@ class FrancisationTests(unittest.TestCase):
 
     def test_paire_geographique(self):
         from jevseo import fr
-        oui = [("Société de recouvrement à Nantes | Cabinet Wegelin",
-                "Société de recouvrement à Reims | Cabinet Wegelin"),
+        oui = [("Société de recouvrement à Nantes | Cabinet Exemple",
+                "Société de recouvrement à Reims | Cabinet Exemple"),
                ("Serrurier à Meaux", "Serrurier sur Melun"),
                ("Plombier Lyon 3e", "Plombier Villeurbanne")]
         for a, b in oui:
@@ -707,11 +707,11 @@ class ContactTests(unittest.TestCase):
 
     def test_extraction_telephone_email_adresse(self):
         from jevseo import fr
-        c = fr.signaux_contact("Cabinet Wegelin 161 Cours Tolstoi, 69100 Villeurbanne "
-                               "Telephone : 04 37 43 00 29 Email : info@clw.fr")
-        self.assertIn("04 37 43 00 29", c["telephones"])
-        self.assertIn("info@clw.fr", c["emails"])
-        self.assertTrue(any("69100" in a for a in c["adresses"]))
+        c = fr.signaux_contact("Cabinet Exemple 12 rue de la Republique, 69002 Lyon "
+                               "Telephone : 04 72 00 00 00 Email : info@exemple.fr")
+        self.assertIn("04 72 00 00 00", c["telephones"])
+        self.assertIn("info@exemple.fr", c["emails"])
+        self.assertTrue(any("69002" in a for a in c["adresses"]))
         self.assertTrue(c["present"])
 
     def test_page_sans_contact(self):
@@ -770,7 +770,7 @@ class LangueQuestionsTests(unittest.TestCase):
 class PageLocaleTests(unittest.TestCase):
     """FR: nommer un lieu ne suffit pas a faire une page ville.
 
-    Regression publi3.com : quatre articles de reference ("Geely avec Como sur
+    Regression d'un site d'imprimeur : quatre articles de reference ("Geely avec Como sur
     Paris", "Club Med a Liege") recoltaient un constat « page ville sans
     contact local » sur un site qui n'a aucune page ville.
     """
@@ -820,7 +820,7 @@ class PageLocaleTests(unittest.TestCase):
 class InvisibiliteTests(unittest.TestCase):
     """FR: l'absence d'opportunite ne doit plus se noter comme l'absence de probleme.
 
-    Regression publi3.com : 11 requetes positionnees, toutes hors sujet et
+    Regression d'un site d'imprimeur : 11 requetes positionnees, toutes hors sujet et
     au-dela de la 20e place. Aucune regle ne pouvait se declencher, donc rien
     n'etait deduit, donc la visibilite sortait a 94/100 sur un site qui fait
     5 visites estimees par mois.

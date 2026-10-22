@@ -9,7 +9,8 @@ Lecture seule, gratuite, non plafonnee par un budget : il n'y a rien a
 depenser. Le seul cout est le temps de reponse de l'API.
 
 Authentification : jeton OAuth de rafraichissement dans
-`~/.config/lunae/gsc_token.json` (surchargeable par GSC_TOKEN_FILE), le
+le fichier indique par GSC_TOKEN_FILE (environnement ou .env, par defaut
+`~/.config/jevseo/gsc_token.json`), le
 format produit par les scripts GSC maison. Portee `webmasters.readonly`.
 """
 from __future__ import annotations
@@ -23,8 +24,14 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+from jevseo.env import secret
+
 API = "https://www.googleapis.com/webmasters/v3"
-JETON = Path(os.environ.get("GSC_TOKEN_FILE") or Path.home() / ".config/lunae/gsc_token.json")
+JETON = Path(
+    os.environ.get("GSC_TOKEN_FILE")
+    or secret("GSC_TOKEN_FILE")
+    or str(Path.home() / ".config/jevseo/gsc_token.json")
+).expanduser()
 FENETRE = 28  # jours. Aligne sur la fenetre de recheck apres une action.
 LIGNES = 5000
 

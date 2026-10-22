@@ -153,8 +153,8 @@ present, il fait foi dans le registre ; sinon on garde le calcul par jetons.
 
 ### 10. Premier audit reel avec jugements Jev (27 septembre 2026)
 
-Passe sur clw.fr via OpenRouter, 30 pages, **34 requetes, 162 363 jetons
-d'entree, 0,0068 $, 0 echec**. Le contrat OpenRouter se comporte exactement
+Passe sur un site client (service B2B a pages ville) via OpenRouter, 30 pages, **34 requetes, moins d'un centime,
+0 echec**. Le contrat OpenRouter se comporte exactement
 comme la doc TypeSafe : racine `answers` / `model` / `provider` / `usage`, et
 `usage.cost` donne le cout reellement facture.
 
@@ -186,8 +186,8 @@ question devient un vrai jugement, `contact_local` : ces coordonnees
 appartiennent-elles au lieu que la page vise, ou a un siege ailleurs ?
 
 Effet mesure : de 0,14-0,17 en zone grise a **0,05-0,07 en bande decisive
-« non »**. Meme conclusion, mais fondee. Sur clw.fr, les 22 pages ville ne
-portent que le numero du siege de Villeurbanne.
+« non »**. Meme conclusion, mais fondee. Sur ce site, les 22 pages ville ne
+portent que le numero du siege.
 
 **c. Les graphiques avaient perdu le gras.** matplotlib ne sait pas exploiter
 l'axe de graisse d'une police variable et retombait sur 300 partout. Des
@@ -201,7 +201,7 @@ C'est le comportement attendu sur une architecture ville x service correcte.
 Sans le filtre, l'upstream aurait envoye 40 paires ville contre ville a un
 modele qui, les titres etant quasi identiques, aurait repondu oui.
 
-**Constats produits sur clw.fr** : `jev_preuve_locale` (severite elevee, le
+**Constats produits sur ce site** : `jev_preuve_locale` (severite elevee, le
 seul constat eleve de l'audit), `jev_coordonnees_locales`, plus
 `jev_local_schema`, `jev_specificity`, `jev_trust`, `jev_meta_fit` et
 `jev_answer_first`. Score 89 (B, partiel), 15 actions.
@@ -210,7 +210,7 @@ seul constat eleve de l'audit), `jev_coordonnees_locales`, plus
 
 **Verdict : l'anglais, et l'ecart n'est pas marginal.**
 
-A/B du 27 septembre 2026 sur clw.fr. Meme corpus, memes cles de reponse, meme
+A/B du 27 septembre 2026 sur le meme site client. Meme corpus, memes cles de reponse, meme
 modele ; la seule variable est la langue de l'enonce. 30 pages jugees deux
 fois, 434 couples de reponses, 60 requetes, 0,0126 $.
 
@@ -257,9 +257,8 @@ propre. Un test verrouille cette invariance.
 
 `answer_first` est indecis dans les deux langues (7 % et 3 %). Verification
 faite, `opening()` extrait correctement le texte apres le H1 : ce sont les
-ouvertures de clw.fr qui sont genuinement ambigues, un slogan suivi de
-libelles de menu (« Notre objectif : la defense de vos interets economiques.
-NOS SOLUTIONS Voir nos solutions »). La question n'est pas cassee, le contenu
+ouvertures du site qui sont genuinement ambigues, un slogan suivi de
+libelles de menu. La question n'est pas cassee, le contenu
 l'est. Le constat `jev_answer_first` est d'ailleurs emis, avec raison.
 
 Piste a creuser : les libelles de navigation qui bavent dans `text_excerpt`
@@ -290,7 +289,7 @@ reponse arrive** et ce qu'il y a a la place avant elle. C'est la difference
 entre un constat et un brief de reecriture.
 
 Desactivee par defaut : elle ajoute jusqu'a 24 questions par page, donc elle
-change le cout d'un run. Mesure sur publi3.com, 43 pages : **0,0108 $ sans,
+change le cout d'un run. Mesure sur un site d'imprimeur, 43 pages : **0,0108 $ sans,
 0,0172 $ avec**.
 
 Trois constats en sortent : `jev_reponse_enterree` (la reponse arrive apres
@@ -304,17 +303,17 @@ travers que l'evaluation upstream documente. La v2 garde quatre roles sur un
 axe disjoint (informe, prouve, decore, chrome) : 40 % de decisivite, confiance
 mediane de 0,53 a 0,67.
 
-**Ce qui restait n'etait pas la question, c'etait le texte.** Sur clw.fr, dont
+**Ce qui restait n'etait pas la question, c'etait le texte.** Sur le site de service, dont
 les pages sont de la prose, le meme jeu de questions donne :
 
-| | publi3.com (fil d'actualite) | clw.fr (pages de service) |
+| | site d'imprimeur (fil d'actualite) | site de service (pages ville) |
 |---|---:|---:|
 | Decisivite | 40 % | **54 %** |
 | Confiance mediane | 0,67 | **0,84** |
 | Passages `navigation` | 51 % | **10 %** |
 | `reponse` decisif | 17 % | **65 %** |
 
-L'instrument fonctionne. Le texte extrait de publi3.com est a moitie du chrome
+L'instrument fonctionne. Le texte extrait du site d'imprimeur est a moitie du chrome
 (libelles de menu, titres d'articles mis bout a bout) et n'est pas segmentable
 en passages a role unique. Une indecision de 40 % y est la bonne reponse.
 
@@ -331,8 +330,8 @@ c'est pourtant la premiere question : qu'est-ce qu'on risque de casser ?
 `jevseo/gsc.py`, lecture seule, gratuite, **active par defaut** : elle s'efface
 d'elle-meme si le jeton manque ou si la propriete n'est pas accessible
 (`--no-gsc` pour la couper, `--gsc-days` pour la fenetre, 28 jours par defaut).
-Authentification par le jeton OAuth de `~/.config/lunae/gsc_token.json`,
-surchargeable par `GSC_TOKEN_FILE`.
+Authentification par le jeton OAuth indique par `GSC_TOKEN_FILE` (variable
+d'environnement ou fichier `.env`), par defaut `~/.config/jevseo/gsc_token.json`.
 
 Quatre constats, tous fondes sur des clics reels :
 
@@ -348,15 +347,15 @@ une mesure et une estimation ne se defendent pas pareil devant un client.
 
 **Un piege GSC que le module traite explicitement.** La dimension « requete »
 est filtree, Google retire les requetes anonymisees, elle sous-compte donc
-systematiquement. Sur clw.fr : **174 clics sur la dimension page, 56 seulement
-sur la dimension requete**, soit une couverture de 32 %. Les totaux se lisent
+systematiquement. Sur le site de service, la dimension requete ne couvrait
+**qu'environ un tiers des clics** de la dimension page. Les totaux se lisent
 donc sur la dimension page, et `totaux.couverture_requetes` dit quelle part du
 trafic une lecture par requete couvre reellement.
 
-Premiere mesure sur clw.fr, 28 jours : 174 clics pour 35 635 impressions, soit
-un CTR de 0,49 %. **129 requetes en cannibalisation reelle**, dont « societe de
-recouvrement » : 871 impressions, **zero clic**, quatre URL dont l'accueil en
-14,5e place et un article de blog en 73e. Le constat devient la premiere action
+Premiere mesure sur le site de service, 28 jours : **129 requetes en
+cannibalisation reelle**, dont la requete principale du metier : plusieurs
+centaines d'impressions, **zero clic**, quatre URL dont l'accueil en 14,5e
+place et un article de blog en 73e. Le constat devient la premiere action
 du plan, impact 100.
 
 **Regression corrigee au passage** : `rescore` ne relisait pas la Search

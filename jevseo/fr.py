@@ -209,7 +209,7 @@ def _nomme_un_lieu(page: dict) -> bool:
 def page_locale(page: dict, corpus: list[dict] | None = None) -> bool:
     """La page est-elle une page a vocation locale, au sens SEO du terme ?
 
-    Nommer un lieu ne suffit pas. Sur publi3.com, quatre ARTICLES DE REFERENCE
+    Nommer un lieu ne suffit pas. Sur un site d'imprimeur, quatre ARTICLES DE REFERENCE
     ("Geely avec Como sur Paris", "Club Med a Liege") passaient l'heuristique
     et recoltaient un constat « page ville sans contact local », sur un site
     qui n'a aucune page ville. Du bruit dans un livrable client.
@@ -583,7 +583,7 @@ LIBELLES_COURTS = {
 # mais « OU EST LA REPONSE », et « que fait le reste du texte ».
 #
 # Ca transforme un constat en brief. Aujourd'hui `answer_first` dit « la page
-# enterre l'essentiel » sur 35 pages de publi3.com. L'anatomie dit a quel
+# enterre l'essentiel » sur 35 pages d'un site d'imprimeur. L'anatomie dit a quel
 # endroit exact la reponse arrive, et ce qu'il y a a la place avant elle.
 
 # v2. La v1 avait neuf roles et 37 % de decisivite seulement, avec `reponse`

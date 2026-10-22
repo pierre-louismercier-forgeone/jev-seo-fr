@@ -246,7 +246,7 @@ def opening(p: dict) -> str:
 def _langue(questions: dict) -> dict:
     """Applique JEVSEO_QUESTIONS_LANG. Anglais par defaut, mesure a l'appui.
 
-    A/B du 27 septembre 2026 sur clw.fr, 30 pages jugees deux fois, 434 couples
+    A/B du 27 septembre 2026 sur un site client, 30 pages jugees deux fois, 434 couples
     de reponses : l'anglais est decisif a 76 %, le francais a 65 %, avec 92 %
     d'accord. Le francais n'est plus decisif sur aucune question. L'ecart se
     concentre sur `page_type` (93 % contre 27 %). Voir scripts/ab_langue.py.
